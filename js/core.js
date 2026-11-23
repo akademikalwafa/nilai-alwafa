@@ -4,7 +4,7 @@
    UI kit: toast, modal, konfirmasi ketik, tabel, skeleton, cetak A4, lazy-lib
    ========================================================================== */
 'use strict';
-const APP_VER = '1.1.0';
+const APP_VER = '1.2.0';
 const $ = (s, el) => (el || document).querySelector(s);
 const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
 const esc = (v) => String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -52,7 +52,8 @@ const KONFIG_OK = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.tes
 const READ = new Set(['ping', 'boot', 'auth.me', 'master.get', 'pengaturan.get', 'log.list', 'mhs.list', 'mhs.detail', 'mhs.cekPindah', 'kelas.list', 'nilai.get',
   'klaim.get', 'lapor.kelas', 'lapor.detail', 'mahad.rekap', 'lulus.list', 'lulus.get', 'cetak.khs', 'cetak.transkrip', 'dasbor.ringkasan', 'dasbor.matriks',
   'dasbor.sebaran', 'batch.list', 'doc.templateList', 'doc.pejabatList', 'doc.list', 'doc.antrean',
-  'kelas.angkatan', 'kelas.pddiktiCek', 'batch.cekBatal', 'kurikulum.hapusCek']);   // v1.1
+  'kelas.angkatan', 'kelas.pddiktiCek', 'batch.cekBatal', 'kurikulum.hapusCek',   // v1.1
+  'sheet.cek', 'sheet.status', 'klaim.hapusCek']);                                   // v1.2
 const Net = {
   n: 0,
   bar() { return $('#netbar'); },
@@ -405,7 +406,7 @@ const App = {
     this.isiPeriode();
     this.isiUser();
     if (b.master.pengaturan.LOGO_URL) $('#brand-mark').innerHTML = '<img src="' + esc(b.master.pengaturan.LOGO_URL) + '" alt="">';
-    if (awal) { window.addEventListener('hashchange', () => this.navigasi()); this.navigasi(); idle(() => this.prefetchAwal()); }
+    if (awal) { window.addEventListener('hashchange', () => this.navigasi()); this.navigasi(); idle(() => this.prefetchAwal()); this.pantauSheet(); }
   },
   prefetchAwal() {
     ['dasbor.ringkasan'].forEach((a) => prefetch(a, {}));
@@ -437,9 +438,10 @@ const App = {
     document.body.innerHTML = '<div id="netbar" class="net-bar"></div><div class="app"><aside class="sidebar"><div class="brand"><div class="brand-mark" id="brand-mark">NA</div><div><div class="brand-t">NILAI – AL WAFA</div><div class="brand-s">Sistem Penilaian Akademik</div></div></div><nav class="nav" id="nav">' +
       MENU.map((m, i) => (i === 8 ? '<div class="nav-label">Sistem</div>' : i === 0 ? '<div class="nav-label">Menu</div>' : '') + '<a href="#/' + m.id + '" data-m="' + m.id + '">' + ic(m.ikon) + '<span>' + esc(m.judul) + '</span></a>').join('') +
       '</nav><div class="side-foot"><div class="user-card"><div class="avatar" id="u-av">A</div><div style="min-width:0;flex:1"><div style="font-weight:620;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="u-nama"></div><div class="muted" style="font-size:12px" id="u-jab"></div></div><button class="btn btn-ghost btn-sm btn-icon" id="btn-keluar" title="Keluar">' + ic('logout') + '</button></div></div></aside>' +
-      '<main class="main"><header class="topbar"><div style="min-width:0"><div class="crumb" id="crumb">NILAI – AL WAFA</div><h1 id="judul">Dasbor</h1></div><span class="spacer"></span><div class="periode-pill" title="Periode kerja (hanya untuk tampilan Anda)">' + ic('cal', 'ic-sm') + '<select id="sel-periode"></select></div><button class="btn btn-ghost btn-icon" id="btn-akun" title="Akun saya">' + ic('user') + '</button></header><section class="content" id="konten"></section></main></div>';
+      '<main class="main"><header class="topbar"><div style="min-width:0"><div class="crumb" id="crumb">NILAI – AL WAFA</div><h1 id="judul">Dasbor</h1></div><span class="spacer"></span><button class="btn btn-sm" id="btn-segar" title="Ambil data terbaru dari spreadsheet (setelah mengubah/menghapus data langsung di Google Sheets)">' + ic('refresh', 'ic-sm') + '<span>Refresh</span></button><div class="periode-pill" title="Periode kerja (hanya untuk tampilan Anda)">' + ic('cal', 'ic-sm') + '<select id="sel-periode"></select></div><button class="btn btn-ghost btn-icon" id="btn-akun" title="Akun saya">' + ic('user') + '</button></header><section class="content" id="konten"></section></main></div>';
     $('#btn-keluar').onclick = () => this.keluar();
     $('#btn-akun').onclick = () => this.menuAkun();
+    $('#btn-segar').onclick = () => this.segarSemua();
     $('#sel-periode').onchange = (e) => { this.periode = e.target.value; sessionStorage.setItem('nw_periode', this.periode); this.render(); };
     $('#nav').addEventListener('mouseover', (e) => { const a = e.target.closest('a[data-m]'); if (a && Hal[a.dataset.m] && Hal[a.dataset.m].prefetch && !a._pf) { a._pf = 1; setTimeout(() => { a._pf = 0; }, 20000); Hal[a.dataset.m].prefetch(); } });
     $('#konten').innerHTML = skelKpi(6) + '<div class="card mt-16">' + skelTabel(6) + '</div>';
@@ -458,7 +460,7 @@ const App = {
   },
   navigasi() {
     if (this.jagaKeluar && !this.jagaKeluar()) { history.replaceState(null, '', '#' + this.rute); return; }
-    this.jagaKeluar = null; window.onbeforeunload = null;
+    this.jagaKeluar = null; this.kotor = null; window.onbeforeunload = null;
     this.rute = location.hash.replace(/^#/, '') || '/dasbor';
     this.render();
   },
@@ -515,6 +517,46 @@ const App = {
       } }]),
       onTutup: () => { _gantiSandiTampil = false; }
     });
+  },
+  /** v1.2 — Refresh: server membaca ulang spreadsheet, tab ini membuang cache, halaman digambar ulang. */
+  async segarSemua() {
+    if (this.jagaKeluar && !this.jagaKeluar()) return;
+    const b = $('#btn-segar');
+    if (b) { b.disabled = true; b.classList.add('berputar'); }
+    try {
+      const r = await api('sistem.segarkan', {});
+      if (!r.success) { toast(r.message, 'err'); return; }
+      if (r.data && r.data.t) this.sheetT = Number(r.data.t);
+      Store.reset(); await this.segarkanMaster();
+      this.jagaKeluar = null; this.kotor = null; window.onbeforeunload = null;
+      this.render();
+      toast('Data terbaru dari spreadsheet sudah dimuat.', 'ok');
+    } finally { if (b) { b.disabled = false; b.classList.remove('berputar'); } }
+  },
+  /** v1.2 — Ikuti perubahan langsung di Google Sheets (pemicu onChange di server memberi stempel; dicek tiap 30 detik). */
+  pantauSheet() {
+    let jalan = false;
+    const cek = async () => {
+      if (jalan || document.hidden || !Sesi.get()) return;
+      jalan = true;
+      try {
+        const r = await apiRaw('sheet.cek', {}, { diam: true });
+        if (!r || !r.success || !r.data) return;
+        const t = Number(r.data.t || 0);
+        if (this.sheetT === undefined) { this.sheetT = t; return; }
+        if (t <= this.sheetT) return;
+        this.sheetT = t;
+        Store.basi();
+        const nama = r.data.sheet && r.data.sheet !== '(semua)' ? ' (sheet ' + r.data.sheet + ')' : '';
+        if ($('.modal-bg') || (this.kotor && this.kotor())) { toast('Ada perubahan di spreadsheet' + nama + '. Tekan Refresh untuk menampilkannya.', 'info', 8000); return; }
+        await this.segarkanMaster(); this.render();
+        toast('Data diperbarui dari spreadsheet' + nama + '.', 'info', 4000);
+      } catch (e) { /* abaikan — dicoba lagi berikutnya */ } finally { jalan = false; }
+    };
+    clearInterval(this._pantau);
+    this._pantau = setInterval(cek, 30000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) cek(); });
+    setTimeout(cek, 4000);
   },
   /** Ambil ulang data induk (setelah simpan Pengaturan/Kurikulum). */
   async segarkanMaster() {

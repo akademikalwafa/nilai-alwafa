@@ -132,12 +132,12 @@ Hal.dasbor = {
 const STATUS_MHS = ['Aktif', 'Cuti', 'Mengundurkan Diri', 'DO', 'Non-aktif', 'Lulus'];
 Hal.mahasiswa = {
   prefetch() { prefetch('mhs.list', {}); },
-  judul: (p) => p[0] ? 'Detail mahasiswa' : 'Mahasiswa',
+  judul: (p) => p[1] ? 'Detail mahasiswa' : 'Mahasiswa',   // p = rute lengkap ['mahasiswa', nim]
   render(el, ctx, p, q) {
     if (p[0]) return HalMhsDetail(el, ctx, decodeURIComponent(p[0]));
     const f = Object.assign({ q: '', prodi: '', angk: '', prog: '', status: 'Aktif', kelas: '' }, App.ingat('mhs') || {}, q.status ? { status: q.status } : {});
     el.innerHTML = '<div class="page-head"><div><h2>Data mahasiswa</h2><div class="desc">Mahasiswa tidak pernah dihapus — perubahan dicatat lewat status & riwayat agar data nilai tetap utuh.</div></div><span class="spacer"></span>' +
-      '<button class="btn" id="m-tarik">' + ic('link') + 'Tarik dari aplikasi lain</button><button class="btn" id="m-impor">' + ic('upload') + 'Impor Excel</button><button class="btn btn-primary" id="m-tambah">' + ic('userplus') + 'Tambah</button></div>' +
+      '<button class="btn" id="m-lulus" title="Ubah status beberapa mahasiswa sekaligus menjadi Lulus (tanpa finalisasi IPK)">' + ic('lulus') + 'Tandai lulus</button><button class="btn" id="m-tarik">' + ic('link') + 'Tarik dari aplikasi lain</button><button class="btn" id="m-impor">' + ic('upload') + 'Impor Excel</button><button class="btn btn-primary" id="m-tambah">' + ic('userplus') + 'Tambah</button></div>' +
       '<div class="card"><div class="toolbar"><div class="search" style="width:260px">' + ic('search') + '<input class="input" id="m-q" placeholder="Cari NIM atau nama…" value="' + esc(f.q) + '"></div>' +
       '<select class="input" id="m-prodi">' + opsi(App.prodi().map((x) => ({ v: x.kode, t: x.kode })), f.prodi, null, 'Semua prodi') + '</select>' +
       '<select class="input" id="m-angk">' + opsi(App.angkatanList(), f.angk, (a) => 'Angkatan ' + a, 'Semua angkatan') + '</select>' +
@@ -174,11 +174,71 @@ Hal.mahasiswa = {
     $('#m-tambah', el).onclick = () => formMahasiswa(null);
     $('#m-impor', el).onclick = () => imporMahasiswa();
     $('#m-tarik', el).onclick = () => Sinkron.buka('MAHASISWA');
+    $('#m-lulus', el).onclick = () => tandaiLulus({ prodi: $('#m-prodi', el).value, angk: $('#m-angk', el).value });
     $('#m-kelasab', el).onclick = () => kelasAB($('#m-prodi', el).value, $('#m-angk', el).value);
     $('#m-tempat', el).onclick = () => penempatanMahad($('#m-angk', el).value);
     $('#m-unduh', el).onclick = () => Excel.tulisSederhana('Mahasiswa.xlsx', ['NIM', 'Nama', 'Prodi', 'Angkatan asal', 'Ikut angkatan', 'Program awal', 'Program kini', 'Kelas lapor', 'Status'], t.hasil().map((r) => [r.nim, r.nama, r.prodi, r.angkatan_asal, r.ikut_angkatan, PROGRAM_LABEL[r.program_awal] || r.program_awal, PROGRAM_LABEL[r.program_kini] || r.program_kini, r.kelas_lapor, r.status]), 'Mahasiswa');
   }
 };
+
+/* ==========================================================================
+   v1.2 — TANDAI LULUS MASSAL (tanpa finalisasi IPK), mis. angkatan 2019 yang sudah lulus.
+   o = { prodi, angk, setelah() }
+   ========================================================================== */
+function tandaiLulus(o) {
+  o = o || {};
+  const daftarAngk = App.angkatanList(), angkAwal = o.angk || daftarAngk[daftarAngk.length - 1];
+  const per = (App.M.periode || []).slice().sort((a, b) => Number(b.id) - Number(a.id));
+  const perDefault = (a) => { const p = periodeDari(a, 8); return per.some((x) => String(x.id) === p) ? p : (per[per.length - 1] || {}).id; };
+  let semua = null, perDiubah = false;
+  const pilih = new Set();
+  const md = modal({
+    judul: 'Tandai lulus', lebar: 'lebar',
+    desc: 'Mengubah status mahasiswa menjadi <b>Lulus</b> tanpa finalisasi IPK — cocok untuk angkatan lama (mis. 2019) yang sudah lulus tetapi datanya belum lengkap di menu Kelulusan. Finalisasi IPK &amp; transkrip tetap bisa dilakukan nanti.',
+    isi: '<div class="fgrid c3 mb-12"><div class="field"><label>Prodi</label><select class="input" id="tl-prodi">' + opsi(App.prodi().map((x) => ({ v: x.kode, t: x.kode + ' — ' + x.nama })), o.prodi || '', null, 'Semua prodi') + '</select></div>' +
+      '<div class="field"><label>Angkatan (ikut)</label><select class="input" id="tl-angk">' + opsi(daftarAngk, angkAwal, (a) => 'Angkatan ' + a) + '</select></div>' +
+      '<div class="field"><label class="req">Periode lulus</label><select class="input" id="tl-per">' + opsi(per.map((p) => ({ v: p.id, t: labelPeriode(p.id) })), perDefault(angkAwal)) + '</select><div class="hint">Bawaan: semester 8 angkatan ini.</div></div>' +
+      '<div class="field"><label>Tanggal yudisium <span class="muted">(opsional)</span></label><input class="input" type="date" id="tl-tgl"></div>' +
+      '<div class="field"><label>No. SK yudisium <span class="muted">(opsional)</span></label><input class="input" id="tl-sk" maxlength="80"></div>' +
+      '<div class="field"><label>Keterangan</label><input class="input" id="tl-ket" value="Ditandai lulus (tanpa finalisasi IPK)" maxlength="300"></div></div><div id="tl-isi">' + skelTabel(6) + '</div>',
+    tombol: [{ teks: 'Riwayat', ikon: 'history', kiri: true, aksi: () => { modalRiwayatBatch('Riwayat tandai lulus', /^LULUS-/, 'Tandai lulus bisa dibatalkan selama IPK mahasiswa belum difinalisasi di menu Kelulusan.', () => { Store.basi(); muat(); }); return false; } },
+      { teks: 'Batal', aksi: () => true }, { teks: 'Tandai lulus', kelas: 'btn-primary', ikon: 'lulus', aksi: async (close, m) => {
+        const nims = Array.from(pilih);
+        if (!nims.length) { toast('Pilih minimal satu mahasiswa.', 'warn'); return false; }
+        const ok = await konfirmasi('Tandai lulus', 'Ubah status <b>' + nims.length + ' mahasiswa</b> menjadi <b>Lulus</b> (periode ' + esc(labelPeriode($('#tl-per', m).value)) + ')? Bisa dibatalkan dari Riwayat selama IPK belum difinalisasi.', 'Tandai lulus');
+        if (!ok) return false;
+        const r = await api('mhs.luluskan', { nims: nims, periode: $('#tl-per', m).value, tgl_yudisium: $('#tl-tgl', m).value, no_sk: $('#tl-sk', m).value.trim(), keterangan: $('#tl-ket', m).value.trim() });
+        if (!r.success) { toast(r.message, 'err', 7000); return false; }
+        toast(r.message + ' Bisa dibatalkan lewat tombol Riwayat.', 'ok', 7000);
+        if (o.setelah) o.setelah(); else App.render();
+        return true;
+      } }]
+  });
+  const el = md.el;
+  const gambar = () => {
+    const box = $('#tl-isi', el); if (!semua) return;
+    const pr = $('#tl-prodi', el).value, an = $('#tl-angk', el).value;
+    const ms = semua.filter((m) => (!pr || m.prodi === pr) && String(m.ikut_angkatan) === String(an));
+    const calon = ms.filter((m) => ['Aktif', 'Cuti', 'Non-aktif'].includes(m.status)).sort((a, b) => String(a.nim).localeCompare(String(b.nim)));
+    const sudah = ms.filter((m) => m.status === 'Lulus').length, keluar = ms.filter((m) => m.status === 'Mengundurkan Diri' || m.status === 'DO').length;
+    pilih.clear(); calon.forEach((m) => pilih.add(m.nim));
+    box.innerHTML = '<div class="row mb-8" style="flex-wrap:wrap;gap:8px"><span class="pill st-Aktif">' + calon.length + ' belum lulus</span><span class="pill no-dot">' + sudah + ' sudah Lulus</span>' + (keluar ? '<span class="pill no-dot">' + keluar + ' mundur/DO (tidak ikut)</span>' : '') + '<span class="spacer"></span><span class="muted" id="tl-ring"></span></div>' +
+      (calon.length ? '<div class="tbl-wrap" style="max-height:40vh"><table class="tbl tbl-compact"><thead><tr><th style="width:28px"><input type="checkbox" id="tl-semua" checked></th><th>NIM</th><th>Nama</th><th>Prodi</th><th>Program</th><th>Status</th></tr></thead><tbody>' +
+        calon.map((m) => '<tr><td><input type="checkbox" data-n="' + esc(m.nim) + '" checked></td><td class="mono">' + esc(m.nim) + '</td><td>' + esc(m.nama) + '</td><td>' + esc(m.prodi) + '</td><td>' + esc(PROGRAM_LABEL[m.program_kini] || m.program_kini || '') + '</td><td>' + pillMhs(m.status) + '</td></tr>').join('') + '</tbody></table></div>'
+        : kosong('Tidak ada mahasiswa yang perlu ditandai', sudah ? 'Semua mahasiswa angkatan ini sudah berstatus Lulus.' : 'Tidak ada mahasiswa Aktif/Cuti/Non-aktif untuk pilihan ini.', 'checkc'));
+    hitung();
+  };
+  const hitung = () => { const r = $('#tl-ring', el); if (r) r.textContent = pilih.size + ' dipilih'; const s = $('#tl-semua', el); if (s) { const n = $$('[data-n]', el).length; s.checked = pilih.size === n && n > 0; s.indeterminate = pilih.size > 0 && pilih.size < n; } };
+  const muat = async () => { const r = await api('mhs.list', {}); if (!r.success) { $('#tl-isi', el).innerHTML = '<div class="alert danger">' + ic('xc') + '<div>' + esc(r.message) + '</div></div>'; return; } semua = r.data; gambar(); };
+  $('#tl-isi', el).addEventListener('change', (e) => {
+    if (e.target.id === 'tl-semua') { $$('[data-n]', el).forEach((c) => { c.checked = e.target.checked; if (c.checked) pilih.add(c.dataset.n); else pilih.delete(c.dataset.n); }); hitung(); return; }
+    const c = e.target.closest('[data-n]'); if (!c) return; if (c.checked) pilih.add(c.dataset.n); else pilih.delete(c.dataset.n); hitung();
+  });
+  $('#tl-prodi', el).onchange = gambar;
+  $('#tl-angk', el).onchange = () => { if (!perDiubah) $('#tl-per', el).value = perDefault($('#tl-angk', el).value); gambar(); };
+  $('#tl-per', el).onchange = () => { perDiubah = true; };
+  muat();
+}
 
 function formMahasiswa(m, onOk) {
   const baru = !m; m = m || { prodi: App.prodi()[0] && App.prodi()[0].kode, angkatan_asal: String(App.periodeAktif).slice(0, 4), program_awal: 'REG' };

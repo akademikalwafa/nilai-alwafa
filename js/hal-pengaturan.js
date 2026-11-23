@@ -246,7 +246,7 @@ function SetSinkron(box, ctx) {
 }
 function riwayatBatch(rows, semua) {
   const r = (rows || []).filter((b) => semua || /^MIG-/.test(b.id));
-  return r.length ? '<div class="tbl-wrap" style="max-height:340px"><table class="tbl tbl-compact"><thead><tr><th>Waktu</th><th>Jenis</th><th>Sumber</th><th class="num">Berhasil</th><th class="num">Dilewati</th><th>Oleh</th><th></th></tr></thead><tbody>' + r.map((b) => '<tr' + (b.dibatalkan ? ' class="r-off"' : '') + '><td class="nowrap">' + esc(fmtWaktu(b.at)) + '</td><td><span class="pill no-dot ' + (/^MIG/.test(b.jenis) ? 'info' : 'brand') + '">' + esc(b.jenis) + '</span></td><td>' + esc(b.sumber) + '<div class="sub mono">' + esc(b.id) + '</div></td><td class="num">' + fmtInt(b.berhasil) + '</td><td class="num">' + fmtInt(b.dilewati) + '</td><td>' + esc(b.oleh) + '</td><td class="aksi">' + (b.dibatalkan ? '<span class="sub">dibatalkan ' + esc(fmtWaktu(String(b.dibatalkan).slice(0, 19))) + '</span>' : /^(MIG|KUR|MKR|KURDEL|PDK)-/.test(b.id) ? '<button class="btn btn-xs" data-batal="' + esc(b.id) + '">' + ic('repeat', 'ic-sm') + 'Batalkan</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>' : kosong('Belum ada riwayat', '', 'history');
+  return r.length ? '<div class="tbl-wrap" style="max-height:340px"><table class="tbl tbl-compact"><thead><tr><th>Waktu</th><th>Jenis</th><th>Sumber</th><th class="num">Berhasil</th><th class="num">Dilewati</th><th>Oleh</th><th></th></tr></thead><tbody>' + r.map((b) => '<tr' + (b.dibatalkan ? ' class="r-off"' : '') + '><td class="nowrap">' + esc(fmtWaktu(b.at)) + '</td><td><span class="pill no-dot ' + (/^MIG/.test(b.jenis) ? 'info' : 'brand') + '">' + esc(b.jenis) + '</span></td><td>' + esc(b.sumber) + '<div class="sub mono">' + esc(b.id) + '</div></td><td class="num">' + fmtInt(b.berhasil) + '</td><td class="num">' + fmtInt(b.dilewati) + '</td><td>' + esc(b.oleh) + '</td><td class="aksi">' + (b.dibatalkan ? '<span class="sub">dibatalkan ' + esc(fmtWaktu(String(b.dibatalkan).slice(0, 19))) + '</span>' : /^(MIG|KUR|MKR|KURDEL|PDK|PETADEL|LULUS)-/.test(b.id) ? '<button class="btn btn-xs" data-batal="' + esc(b.id) + '">' + ic('repeat', 'ic-sm') + 'Batalkan</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>' : kosong('Belum ada riwayat', '', 'history');
 }
 async function batalBatch(id, after) {
   if (!/^MIG-/.test(id)) return batalBatchUmum(id, after);          // v1.1: KUR/MKR/KURDEL/PDK
@@ -256,7 +256,7 @@ async function batalBatch(id, after) {
 }
 
 /* ---------------------------------------------------------------- v1.1: pembatalan batch impor kurikulum / MK riil / hapus kurikulum / kelas PDDIKTI */
-const JENIS_BATCH_V11 = { KUR: 'Impor kurikulum', MKR: 'Impor MK riil', KURDEL: 'Hapus kurikulum', PDK: 'Kelas PDDIKTI' };
+const JENIS_BATCH_V11 = { KUR: 'Impor kurikulum', MKR: 'Impor MK riil', KURDEL: 'Hapus kurikulum', PDK: 'Kelas PDDIKTI', PETADEL: 'Hapus peta klaim', LULUS: 'Tandai lulus' };
 async function batalBatchUmum(id, after) {
   const c = await api('batch.cekBatal', { batch: id });
   if (!c.success) { toast(c.message, 'err'); return; }
@@ -264,8 +264,10 @@ async function batalBatchUmum(id, after) {
   const kotak = (n, t) => '<div><b>' + fmtInt(n) + '</b><span>' + esc(t) + '</span></div>';
   const isiRingkas = jenis === 'PDK'
     ? kotak(R.kelas, 'kelas dihapus') + kotak(R.peserta, 'peserta dihapus') + kotak(R.peta, 'aturan peta dikembalikan') + kotak(R.bernilai, 'peserta sudah bernilai')
+    : jenis === 'PETADEL' ? kotak(R.dikembalikan, 'aturan peta dikembalikan') + kotak(R.dipertahankan, 'dilewati (sudah ada aturan baru)')
+    : jenis === 'LULUS' ? kotak(R.mhs, 'mahasiswa kembali ke status sebelumnya') + kotak(R.dipertahankan, 'dipertahankan (sudah final / berubah)')
     : kotak(R.dihapus, 'MK dihapus') + kotak(R.dipulihkan, 'MK dikembalikan ke data lama') + kotak(R.dikembalikan, 'MK yang dihapus dipulihkan') + kotak(R.dipertahankan, 'MK dipertahankan (sudah dipakai)');
-  const tetap = (d.tetap || []).length ? '<div class="mt-12"><div class="lbl mb-4">Dipertahankan karena sudah dipakai</div><div class="tbl-wrap" style="max-height:200px"><table class="tbl tbl-compact"><tbody>' + d.tetap.map((x) => '<tr><td class="mono nowrap">' + esc(x.kode) + '</td><td>' + esc(x.nama) + '</td><td class="sub">' + esc(x.alasan) + '</td></tr>').join('') + '</tbody></table></div></div>' : '';
+  const tetap = (d.tetap || []).length ? '<div class="mt-12"><div class="lbl mb-4">' + (jenis === 'LULUS' || jenis === 'PETADEL' ? 'Tidak ikut dikembalikan' : 'Dipertahankan karena sudah dipakai') + '</div><div class="tbl-wrap" style="max-height:200px"><table class="tbl tbl-compact"><tbody>' + d.tetap.map((x) => '<tr><td class="mono nowrap">' + esc(x.kode) + '</td><td>' + esc(x.nama) + '</td><td class="sub">' + esc(x.alasan) + '</td></tr>').join('') + '</tbody></table></div></div>' : '';
   if (!d.bisa) {
     modal({ judul: 'Tidak bisa dibatalkan', isi: '<div class="alert warn mb-12">' + ic('warn') + '<div>' + esc(d.pesan || 'Batch ini tidak bisa dibatalkan.') + '</div></div><div class="ringkas-batal">' + isiRingkas + '</div>' + tetap });
     return;
@@ -438,11 +440,37 @@ function SetKeamanan(box, ctx) {
   pakai(ctx, 'pengaturan.get', {}, (d) => {
     box.innerHTML = kartu('Akun Anda', '<div class="row-wrap"><button class="btn" id="ke-sandi">' + ic('key') + 'Ganti kata sandi</button><button class="btn" id="ke-semua">' + ic('shield') + 'Keluar dari semua perangkat</button></div><p class="muted mt-12" style="font-size:12.5px">Sesi login berlaku 8 jam dan tersimpan hanya di tab browser ini. 5× salah sandi → akun terkunci 15 menit.</p>') +
       kartu('Verifikasi Pusat (opsional)', '<p class="muted" style="font-size:13px">Bila institusi memakai satu situs Verifikasi Pusat untuk semua aplikasi, isi data berikut. Nilai rahasia disimpan di Script Properties dan tidak pernah ditampilkan utuh.</p>' + d.rahasia.map((r) => '<div class="field mb-12"><label>' + esc(r.label) + ' ' + (r.ada ? '<span class="pill s-SD">terisi</span>' : '<span class="pill">kosong</span>') + '</label><div class="row"><input class="input mono" type="' + (/KUNCI/.test(r.kunci) ? 'password' : 'text') + '" autocomplete="off" data-r="' + r.kunci + '" placeholder="' + esc(r.samar || 'belum diisi') + '"><button class="btn" data-rs="' + r.kunci + '">Simpan</button>' + (r.ada ? '<button class="btn btn-ghost" data-rh="' + r.kunci + '">Hapus</button>' : '') + '</div></div>').join('')) +
-      kartu('Sistem', '<div class="kv"><span class="muted">Versi backend</span><b>' + esc(d.versi) + '</b></div><div class="kv"><span class="muted">Versi frontend</span><b>' + APP_VER + '</b></div><div class="kv"><span class="muted">Database</span><b>' + esc(d.db) + '</b></div><div class="kv"><span class="muted">Pemicu terjadwal</span><span>' + (d.trigger.length ? d.trigger.map((x) => '<span class="chip">' + esc(x) + '</span>').join(' ') : '<span class="pill warn">tidak ada</span>') + '</span></div><div class="kv"><span class="muted">Pemanasan cache terakhir</span><span>' + esc(d.warm ? fmtWaktu(d.warm.at) + ' (' + d.warm.scope + ')' : '–') + '</span></div><div class="row mt-12"><button class="btn btn-sm" id="ke-perf">' + ic('chart', 'ic-sm') + 'Ringkasan kecepatan (console)</button><button class="btn btn-sm" id="ke-cache">' + ic('refresh', 'ic-sm') + 'Bersihkan cache tab ini</button></div>');
+      kartu('Sistem', '<div class="kv"><span class="muted">Versi backend</span><b>' + esc(d.versi) + '</b></div><div class="kv"><span class="muted">Versi frontend</span><b>' + APP_VER + '</b></div><div class="kv"><span class="muted">Database</span><b>' + esc(d.db) + '</b></div><div class="kv"><span class="muted">Pemicu terjadwal</span><span>' + (d.trigger.length ? d.trigger.map((x) => '<span class="chip">' + esc(x) + '</span>').join(' ') : '<span class="pill warn">tidak ada</span>') + '</span></div><div class="kv"><span class="muted">Pemanasan cache terakhir</span><span>' + esc(d.warm ? fmtWaktu(d.warm.at) + ' (' + d.warm.scope + ')' : '–') + '</span></div><div class="row mt-12"><button class="btn btn-sm" id="ke-perf">' + ic('chart', 'ic-sm') + 'Ringkasan kecepatan (console)</button><button class="btn btn-sm" id="ke-cache">' + ic('refresh', 'ic-sm') + 'Bersihkan cache tab ini</button><button class="btn btn-sm btn-primary" id="ke-segar" title="Pakai setelah mengubah/menghapus data langsung di Google Sheets">' + ic('db', 'ic-sm') + 'Muat ulang dari spreadsheet</button></div><p class="muted mt-8" style="font-size:12.5px">Mengubah atau menghapus data <b>langsung di Google Sheets</b> tidak otomatis terlihat (aplikasi memakai cache server ±6 jam agar cepat). Tekan <b>Muat ulang dari spreadsheet</b> setelahnya. Sebaiknya ubah data lewat aplikasi agar aturan &amp; riwayat tetap terjaga.</p>');
+    // v1.2 — kartu sinkron otomatis spreadsheet (disisipkan sebelum kartu Sistem)
+    const kSis = $$('.card', box).pop();
+    if (kSis) kSis.insertAdjacentHTML('beforebegin', kartu('Sinkron otomatis spreadsheet', '<div id="ke-sinkron">' + skelTabel(2) + '</div>', '', 'Perubahan atau penghapusan data langsung di Google Sheets ikut tampil di aplikasi.'));
+    const gambarSinkron = async () => {
+      const w = $('#ke-sinkron', box); if (!w) return;
+      const r = await api('sheet.status', {});
+      if (!r.success) { w.innerHTML = '<div class="alert warn">' + ic('warn') + '<div>' + esc(r.message) + '</div></div>'; return; }
+      const d2 = r.data, t = d2.terakhir || {};
+      const st = !d2.aktif ? '<span class="pill no-dot">Mati</span>' : d2.terpasang ? '<span class="pill st-Aktif">Aktif</span>' : '<span class="pill s-SL">Menunggu dipasang</span>';
+      w.innerHTML = '<div class="kv"><span class="muted">Status</span><b>' + st + '</b></div>' +
+        '<div class="kv"><span class="muted">Perubahan terakhir di spreadsheet</span><b>' + (t.t ? esc(new Date(Number(t.t)).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })) + (t.sheet ? ' · ' + esc(t.sheet) : '') : '<span class="soft">belum ada</span>') + '</b></div>' +
+        '<p class="muted mt-8" style="font-size:12.5px">' + (d2.aktif ? 'Saat data diubah atau dihapus langsung di Google Sheets, cache server ikut diperbarui dan tab aplikasi yang terbuka menyegarkan diri dalam ±30 detik. ' : 'Sinkron otomatis dimatikan — tekan <b>Refresh</b> di kanan atas setelah mengubah spreadsheet. ') + (d2.aktif && !d2.terpasang ? 'Pemicu dipasang otomatis paling lambat 5 menit setelah kode diperbarui, atau tekan <b>Pasang sekarang</b>.' : '') + '</p>' +
+        '<div class="row-wrap mt-8">' + (d2.aktif ? (d2.terpasang ? '' : '<button class="btn btn-sm btn-primary" data-sk="1">' + ic('link', 'ic-sm') + 'Pasang sekarang</button>') + '<button class="btn btn-sm btn-ghost" data-sk="0">' + ic('x', 'ic-sm') + 'Matikan</button>' : '<button class="btn btn-sm btn-primary" data-sk="1">' + ic('refresh', 'ic-sm') + 'Nyalakan</button>') + '</div>';
+    };
+    gambarSinkron();
+    $('#ke-sinkron', box).addEventListener('click', async (e) => {
+      const b = e.target.closest('[data-sk]'); if (!b) return;
+      const r = await tombolProses(b, () => api('sheet.otomatis', { aktif: b.dataset.sk === '1' }));
+      toast(r.message, r.success ? 'ok' : 'err', 7000); gambarSinkron();
+    });
     $('#ke-sandi', box).onclick = () => App.gantiSandi(false);
     $('#ke-semua', box).onclick = () => App.menuAkun();
     $('#ke-perf', box).onclick = () => { Perf.summary(); toast('Lihat Console (F12).', 'info'); };
     $('#ke-cache', box).onclick = () => { Store.reset(); toast('Cache tab dibersihkan.'); };
+    $('#ke-segar', box).onclick = async () => {                       // v1.1: setelah edit langsung di Sheets
+      if (!await konfirmasi('Muat ulang dari spreadsheet', 'Aplikasi akan membaca ulang seluruh data dari Google Sheets. Data tidak diubah. Halaman pertama setelah ini bisa sedikit lebih lambat.', 'Muat ulang')) return;
+      const r = await api('sistem.segarkan', {});
+      if (!r.success) return toast(r.message, 'err');
+      Store.reset(); await App.segarkanMaster(); toast(r.message, 'ok');
+    };
     box.onclick = async (e) => {
       const s = e.target.closest('[data-rs]'), h = e.target.closest('[data-rh]');
       if (s) { const i = $('[data-r="' + s.dataset.rs + '"]', box); if (!i.value.trim()) return toast('Isi nilainya dulu.', 'warn'); const r = await api('rahasia.simpan', { kunci: s.dataset.rs, nilai: i.value.trim() }); i.value = ''; toast(r.message, r.success ? 'ok' : 'err'); if (r.success) SetKeamanan(box, ctx); }
