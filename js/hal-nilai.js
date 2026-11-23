@@ -13,14 +13,15 @@ function skala(n) {
 /* ============================================================== PERKULIAHAN */
 Hal.perkuliahan = {
   prefetch() { prefetch('kelas.list', { periode: App.periode }); },
-  judul: (p) => p[0] ? 'Input nilai' : 'Perkuliahan & Nilai',
-  render(el, ctx, p) {
+  judul: (p) => p[1] === 'rekap' ? 'Rekap nilai per angkatan' : p[1] ? 'Input nilai' : 'Perkuliahan & Nilai',   // p = rute lengkap ['perkuliahan', …]
+  render(el, ctx, p, q) {
+    if (p[0] === 'rekap') return HalRekap(el, ctx, q || {});          // v1.1
     if (p[0]) return HalNilai(el, ctx, p[0]);
     const f = Object.assign({ prodi: '', angk: '', q: '' }, App.ingat('kls') || {});
-    el.innerHTML = '<div class="page-head"><div><h2>Kelas kuliah · ' + esc(labelPeriode(App.periode)) + '</h2><div class="desc">Nilai riil diisi per kelas (ketik, tempel dari Excel, atau unggah file). Ganti periode di kanan atas.</div></div><span class="spacer"></span><button class="btn" id="k-tambah">' + ic('plus') + 'Tambah kelas</button><button class="btn btn-primary" id="k-gen">' + ic('spark') + 'Buat kelas otomatis</button></div>' +
+    el.innerHTML = '<div class="page-head"><div style="flex:1;min-width:260px"><h2>Kelas kuliah · ' + esc(labelPeriode(App.periode)) + '</h2><div class="desc">Nilai riil diisi per kelas (ketik, tempel dari Excel, atau unggah file). Ganti periode di kanan atas.</div></div><span class="spacer"></span><button class="btn" id="k-rekap" title="Mata kuliah apa saja yang sudah/belum bernilai di satu angkatan">' + ic('layers') + 'Rekap angkatan</button><button class="btn" id="k-pddikti" title="Kelas langsung dari MK kurikulum PDDIKTI, tanpa MK riil (mis. untuk mahasiswa yang sudah lulus)">' + ic('lapor') + 'Kelas PDDIKTI</button><button class="btn" id="k-tambah">' + ic('plus') + 'Tambah kelas</button><button class="btn btn-primary" id="k-gen">' + ic('spark') + 'Buat kelas otomatis</button></div>' +
       '<div id="k-kpi"></div><div class="card mt-16"><div class="toolbar"><div class="search" style="width:260px">' + ic('search') + '<input class="input" id="k-q" placeholder="Cari MK / dosen…" value="' + esc(f.q) + '"></div><select class="input" id="k-prodi">' + opsi(App.prodi().map((x) => x.kode), f.prodi, null, 'Semua prodi') + '</select><select class="input" id="k-angk">' + opsi(App.angkatanList(), f.angk, (a) => 'Angkatan ' + a, 'Semua angkatan') + '</select><span class="spacer"></span><span class="muted" id="k-info"></span></div><div id="k-tbl">' + skelTabel(8) + '</div></div>';
     const t = Tabel($('#k-tbl', el), { id: (r) => r.id, urut: 'prodi', perHalaman: 50, tinggi: true, kolom: [
-      { k: 'mk', label: 'Mata kuliah riil', html: (r) => '<b style="font-weight:600">' + esc(r.mk) + '</b><div class="sub">' + esc(r.sks) + ' SKS' + (r.rombel && r.rombel !== 'A' ? ' · rombel ' + esc(r.rombel) : '') + (r.batch ? ' · <span title="hasil migrasi">migrasi</span>' : '') + '</div>' },
+      { k: 'mk', label: 'Mata kuliah riil', html: (r) => '<b style="font-weight:600">' + esc(r.mk) + '</b><div class="sub">' + esc(r.sks) + ' SKS' + (r.rombel && r.rombel !== 'A' ? ' · rombel ' + esc(r.rombel) : '') + (r.batch && !/^pd-/.test(r.mk_riil_id) ? ' · <span title="hasil migrasi">migrasi</span>' : '') + (/^pd-/.test(r.mk_riil_id) ? ' · <span class="pill no-dot brand" title="Kelas langsung dari MK kurikulum PDDIKTI (tanpa MK riil)">PDDIKTI</span>' : '') + '</div>' },
       { k: 'prodi', label: 'Prodi' },
       { k: 'ikut_angkatan', label: 'Angkatan', html: (r) => esc(r.ikut_angkatan) + ' <span class="sub">smt ' + r.smt + '</span>' },
       { k: 'program', label: 'Program', html: (r) => esc(progLabel(r.program)) },
@@ -38,6 +39,8 @@ Hal.perkuliahan = {
     pakai(ctx, 'kelas.list', { periode: App.periode }, (d) => { t.st.rows = d; saring(); });
     $('#k-gen', el).onclick = () => buatKelasOtomatis(f.prodi || (App.prodi()[0] || {}).kode);
     $('#k-tambah', el).onclick = () => tambahKelas(f.prodi || (App.prodi()[0] || {}).kode, f.angk);
+    $('#k-rekap', el).onclick = () => App.pergi('/perkuliahan/rekap' + (f.prodi || f.angk ? '?prodi=' + encodeURIComponent(f.prodi || '') + '&angkatan=' + encodeURIComponent(f.angk || '') : ''));
+    $('#k-pddikti', el).onclick = () => kelasPddikti({ prodi: f.prodi || (App.prodi()[0] || {}).kode, angk: f.angk });
   }
 };
 
@@ -82,7 +85,7 @@ function tambahKelas(prodi, angk) {
       toast(r.message); App.pergi('/perkuliahan/' + r.data.id); return true;
     } }]
   });
-  const isiMk = () => { const pr = $('#tk-prodi', md.el).value; $('#tk-mk', md.el).innerHTML = opsi(App.M.mkriil.filter((m) => m.prodi === pr && String(m.aktif) !== '0').sort((a, b) => Number(a.smt_ajar) - Number(b.smt_ajar)).map((m) => ({ v: m.id, t: 'Smt ' + (m.smt_ajar || '?') + ' · ' + m.nama_mk + ' (' + progLabel(m.program) + ')' })), '', null, '— pilih —'); };
+  const isiMk = () => { const pr = $('#tk-prodi', md.el).value; $('#tk-mk', md.el).innerHTML = opsi(App.M.mkriil.filter((m) => m.prodi === pr && String(m.aktif) !== '0' && !/^pd-/.test(m.id)).sort((a, b) => Number(a.smt_ajar) - Number(b.smt_ajar)).map((m) => ({ v: m.id, t: 'Smt ' + (m.smt_ajar || '?') + ' · ' + m.nama_mk + ' (' + progLabel(m.program) + ')' })), '', null, '— pilih —'); };
   $('#tk-prodi', md.el).onchange = isiMk; isiMk();
 }
 
@@ -333,3 +336,192 @@ Hal.klaim = {
     muat();
   }
 };
+
+/* ==========================================================================
+   v1.1 — REKAP NILAI PER ANGKATAN  (#/perkuliahan/rekap?prodi=..&angkatan=..)
+   Menjawab: "angkatan ini, mata kuliah apa saja yang sudah ada nilainya?"
+   ========================================================================== */
+function HalRekap(el, ctx, q) {
+  const ing = App.ingat('rekap') || {}, mxIng = (App.ingat('dasbor') || {}).mx || {};
+  const f = { prodi: q.prodi || ing.prodi || mxIng.prodi || (App.prodi()[0] || {}).kode, angk: q.angkatan || ing.angk || mxIng.angk || App.angkatanList()[0], saring: ing.saring || 'semua', q: '' };
+  const pilih = new Set();
+  el.innerHTML = '<div class="page-head"><div style="flex:1;min-width:260px"><h2>Rekap nilai per angkatan</h2><div class="desc">MK kurikulum PDDIKTI yang sudah & belum bernilai di satu angkatan, beserta kelas pengisinya di semua periode.</div></div>' +
+    '<button class="btn" id="rk-kembali">' + ic('back') + 'Kelas kuliah</button><button class="btn" id="rk-riw">' + ic('history') + 'Riwayat kelas PDDIKTI</button><button class="btn" id="rk-xls">' + ic('download') + 'Unduh Excel</button></div>' +
+    '<div id="rk-kpi">' + skelKpi(4) + '</div>' +
+    '<div class="card mt-16"><div class="toolbar"><select class="input" id="rk-prodi" title="Prodi">' + opsi(App.prodi().map((x) => ({ v: x.kode, t: x.kode })), f.prodi) + '</select><select class="input" id="rk-angk">' + opsi(App.angkatanList(), f.angk, (a) => 'Angkatan ' + a) + '</select>' +
+    '<div class="seg" id="rk-seg">' + [['semua', 'Semua'], ['lengkap', 'Sudah lengkap'], ['sebagian', 'Sebagian'], ['belum', 'Belum ada nilai']].map((x) => '<button data-v="' + x[0] + '"' + (f.saring === x[0] ? ' class="on"' : '') + '>' + x[1] + '</button>').join('') + '</div>' +
+    '<div class="search" style="width:190px">' + ic('search') + '<input class="input" id="rk-q" placeholder="Cari MK…"></div><span class="spacer"></span><span class="muted" id="rk-pil"></span><button class="btn btn-sm btn-primary" id="rk-buat" disabled>' + ic('plus') + 'Buat kelas PDDIKTI</button></div>' +
+    '<div class="row" style="padding:10px 14px 0">' + legendaStatus() + '</div><div id="rk-isi">' + skelTabel(10) + '</div></div>';
+  let mx = null, kelas = null, rows = [];
+  const kelasMk = (k) => {                                     // kelas angkatan ini yang menjadi sumber nilai MK kurikulum k
+    const p = mx.peta[k.id]; if (!p || !kelas) return [];
+    return kelas.filter((x) => p.sumber.includes(x.mk_riil_id)).sort((a, b) => a.periode.localeCompare(b.periode));
+  };
+  const susun = () => {
+    rows = mx.kur.map((k) => {
+      const c = { SD: 0, SX: 0, SL: 0, MN: 0, BP: 0, TB: 0 };
+      mx.mhs.forEach((m) => { const x = (mx.cells[m.nim] || {})[k.id] || ['BP']; c[x[0]]++; });
+      const n = mx.mhs.length - c.TB, bernilai = c.SD + c.SX + c.SL, belum = c.MN + c.BP;
+      const kat = !n || !belum ? 'lengkap' : !bernilai ? 'belum' : 'sebagian';
+      return { k: k, c: c, n: n, bernilai: bernilai, belum: belum, kat: kat, kelas: kelasMk(k), peta: mx.peta[k.id] };
+    });
+  };
+  const gambar = () => {
+    if (!mx || !kelas) return;
+    const box = $('#rk-isi', el);
+    if (!mx.kur.length) { box.innerHTML = kosong('Kurikulum belum ada', 'Isi kurikulum prodi ini di menu Kurikulum.', 'book'); $('#rk-kpi', el).innerHTML = ''; return; }
+    if (!mx.mhs.length) { box.innerHTML = kosong('Belum ada mahasiswa', 'Tidak ada mahasiswa ' + esc(f.prodi) + ' yang ikut angkatan ' + esc(f.angk) + '.', 'users'); $('#rk-kpi', el).innerHTML = ''; return; }
+    susun();
+    const lengkap = rows.filter((r) => r.kat === 'lengkap'), belum = rows.filter((r) => r.kat === 'belum'), sebagian = rows.filter((r) => r.kat === 'sebagian');
+    const sks = (rs) => rs.reduce((s, r) => s + Number(r.k.sks || 0), 0), st = {};
+    mx.mhs.forEach((m) => { st[m.status] = (st[m.status] || 0) + 1; });
+    $('#rk-kpi', el).innerHTML = '<div class="grid g4">' + [
+      ['users', mx.mhs.length, 'Mahasiswa ' + f.prodi + ' ' + f.angk, Object.keys(st).map((s) => st[s] + ' ' + s).join(' · ')],
+      ['book', rows.length + ' MK', 'Kurikulum berlaku', sks(rows) + ' SKS'],
+      ['checkc', lengkap.length + ' MK', 'Sudah lengkap bernilai', sks(lengkap) + ' SKS' + (sebagian.length ? ' · ' + sebagian.length + ' MK sebagian' : '')],
+      ['clip', belum.length + ' MK', 'Belum ada nilai sama sekali', sks(belum) + ' SKS']
+    ].map((x) => '<div class="card kpi"><div class="kpi-ic">' + ic(x[0]) + '</div><div><div class="kpi-v">' + esc(x[1]) + '</div><div class="kpi-l">' + esc(x[2]) + '</div><div class="sub" style="font-size:12px;color:var(--soft);margin-top:2px">' + esc(x[3]) + '</div></div></div>').join('') + '</div>';
+    const qn = normNama(f.q);
+    const tampil = rows.filter((r) => (f.saring === 'semua' || r.kat === f.saring) && (!qn || normNama(r.k.kode + ' ' + r.k.nama).includes(qn)));
+    if (!tampil.length) { box.innerHTML = kosong('Tidak ada mata kuliah', f.saring === 'belum' ? 'Semua MK sudah punya nilai untuk angkatan ini.' : 'Ubah saringan.', 'filter'); hitungPilih(); return; }
+    const smt = Array.from(new Set(tampil.map((r) => r.k.smt))).sort((a, b) => a - b);
+    const chip = (x) => '<a class="chip" href="#/perkuliahan/' + encodeURIComponent(x.id) + '" title="' + esc(x.mk + ' · ' + labelPeriode(x.periode) + (x.dosen ? ' · ' + x.dosen : '')) + '">' + (x.pddikti ? '<b>PDDIKTI</b>' : esc(x.mk.length > 26 ? x.mk.slice(0, 25) + '…' : x.mk)) + ' · smt ' + x.smt + ' · ' + x.terisi + '/' + x.peserta + '</a>';
+    box.innerHTML = '<div class="tbl-wrap tall"><table class="tbl tbl-compact"><thead><tr><th style="width:28px"><input type="checkbox" id="rk-semua" title="Pilih semua MK yang belum lengkap"></th><th>Kode</th><th style="min-width:190px">Mata kuliah</th><th class="num">SKS</th><th style="width:190px">Sudah bernilai</th><th class="num">Dilapor</th><th class="num">Belum</th><th>Kelas pengisi (klik untuk isi nilai)</th><th>Periode lapor</th></tr></thead><tbody>' +
+      smt.map((s) => {
+        const rs = tampil.filter((r) => r.k.smt === s);
+        return '<tr class="grp"><td colspan="9"><b>Semester ' + esc(s || '?') + '</b> <span class="muted">· ' + rs.length + ' MK · ' + sks(rs) + ' SKS · ' + rs.filter((r) => r.kat === 'lengkap').length + ' lengkap</span></td></tr>' +
+          rs.map((r) => {
+            const per = r.peta && r.peta.periode ? labelPeriode(r.peta.periode) : '';
+            return '<tr class="klik" data-mk="' + esc(r.k.id) + '"><td>' + (r.belum ? '<input type="checkbox" data-pil="' + esc(r.k.id) + '"' + (pilih.has(r.k.id) ? ' checked' : '') + '>' : ic('checkc', 'ic-sm') ) + '</td><td class="mono nowrap">' + esc(r.k.kode) + '</td><td>' + esc(r.k.nama) + (r.k.jenis ? ' <span class="pill no-dot brand">' + esc(r.k.jenis) + '</span>' : '') + '</td><td class="num">' + r.k.sks + '</td>' +
+              '<td><div class="row" style="gap:8px">' + statbar(r.c) + '<span class="sub nowrap">' + r.bernilai + '/' + r.n + '</span></div></td><td class="num">' + (r.c.SD + r.c.SX) + '</td><td class="num">' + (r.belum ? '<b style="color:var(--s-MN)">' + r.belum + '</b>' : '0') + '</td>' +
+              '<td><div class="row-wrap" style="gap:4px">' + (r.kelas.length ? r.kelas.map(chip).join('') : (r.peta && r.peta.sumber.length ? '<span class="soft">sumber dipetakan, belum ada kelas di sistem</span>' : '<span class="soft">belum dipetakan</span>')) + '</div></td><td class="nowrap">' + (per ? esc(per) : '<span class="soft">–</span>') + '</td></tr>';
+          }).join('');
+      }).join('') + '</tbody></table></div>';
+    const semua = $('#rk-semua', box);
+    semua.onchange = () => { $$('[data-pil]', box).forEach((c) => { c.checked = semua.checked; if (semua.checked) pilih.add(c.dataset.pil); else pilih.delete(c.dataset.pil); }); hitungPilih(); };
+    hitungPilih();
+  };
+  const hitungPilih = () => {
+    $('#rk-pil', el).textContent = pilih.size ? pilih.size + ' MK dipilih' : '';
+    $('#rk-buat', el).disabled = !pilih.size;
+  };
+  const muat = () => {
+    App.ingat('rekap', { prodi: f.prodi, angk: f.angk, saring: f.saring });
+    mx = null; kelas = null; pilih.clear(); $('#rk-isi', el).innerHTML = skelTabel(10);
+    const d = { prodi: f.prodi, angkatan: f.angk };
+    pakai(ctx, 'dasbor.matriks', d, (x) => { mx = x; gambar(); });
+    pakai(ctx, 'kelas.angkatan', d, (x) => { kelas = x; gambar(); });
+  };
+  const detail = (r) => {
+    const daftar = mx.mhs.map((m) => ({ m: m, x: (mx.cells[m.nim] || {})[r.k.id] || ['BP'] })).sort((a, b) => URUT_STATUS.indexOf(a.x[0]) - URUT_STATUS.indexOf(b.x[0]) || a.m.nama.localeCompare(b.m.nama));
+    const md = modal({ judul: r.k.kode + ' · ' + r.k.nama, lebar: 'lebar', desc: f.prodi + ' angkatan ' + f.angk + ' · ' + r.k.sks + ' SKS · semester ' + r.k.smt + ' · ' + r.bernilai + ' dari ' + r.n + ' mahasiswa sudah bernilai',
+      isi: (r.kelas.length ? '<div class="row-wrap mb-12" style="gap:6px"><span class="muted">Kelas:</span>' + r.kelas.map((x) => '<a class="chip" href="#/perkuliahan/' + encodeURIComponent(x.id) + '">' + esc(x.pddikti ? 'PDDIKTI' : x.mk) + ' · ' + esc(labelPeriode(x.periode)) + ' · ' + x.terisi + '/' + x.peserta + '</a>').join('') + '</div>' : '') +
+        '<div class="tbl-wrap" style="max-height:56vh"><table class="tbl tbl-compact"><thead><tr><th>NIM</th><th>Nama</th><th>Status mhs</th><th>Status nilai</th><th class="num">Nilai</th><th>Huruf</th><th>Periode</th></tr></thead><tbody>' +
+        daftar.map((d) => '<tr><td class="mono">' + esc(d.m.nim) + '</td><td><a href="#/mahasiswa/' + encodeURIComponent(d.m.nim) + '">' + esc(d.m.nama) + '</a></td><td>' + pillMhs(d.m.status) + '</td><td>' + pillStatus(d.x[0]) + '</td><td class="num">' + fmt2(d.x[1]) + '</td><td>' + esc(d.x[0] === 'SD' || d.x[0] === 'SX' ? d.x[3] : d.x[0] === 'SL' ? skala(d.x[1]).huruf : '') + '</td><td>' + esc(labelPeriode(d.x[2] || '')) + '</td></tr>').join('') + '</tbody></table></div>',
+      tombol: [{ teks: 'Tutup', aksi: () => true }].concat(r.belum ? [{ teks: 'Buat kelas PDDIKTI untuk ' + r.belum + ' mahasiswa', kelas: 'btn-primary', ikon: 'plus', aksi: () => { setTimeout(() => kelasPddikti({ prodi: f.prodi, angk: f.angk, mkIds: [r.k.id], status: ['Lulus', 'Aktif', 'Cuti', 'Non-aktif'], setelah: muat }), 0); return true; } }] : []) });
+    md.el.addEventListener('click', (e) => { if (e.target.closest('a[href^="#/"]')) md.close(); });
+  };
+  const unduh = async () => {
+    if (!mx || !kelas) return;
+    susun();
+    await Excel.tulisSederhana('Rekap-nilai-' + f.prodi + '-' + f.angk + '.xlsx', ['Smt', 'Kode MK', 'Mata Kuliah', 'SKS', 'Jumlah Mhs', 'Sudah Bernilai', 'Sudah Dilapor', 'Siap Lapor', 'Belum Bernilai', 'Keterangan', 'Periode Lapor', 'Kelas Pengisi'],
+      rows.map((r) => [r.k.smt, r.k.kode, r.k.nama, r.k.sks, r.n, r.bernilai, r.c.SD + r.c.SX, r.c.SL, r.belum, { lengkap: 'Lengkap', sebagian: 'Sebagian', belum: 'Belum ada nilai' }[r.kat], r.peta && r.peta.periode ? labelPeriode(r.peta.periode) : '', r.kelas.map((x) => (x.pddikti ? 'PDDIKTI' : x.mk) + ' (' + labelPeriode(x.periode) + ', ' + x.terisi + '/' + x.peserta + ')').join('; ')]), 'Rekap ' + f.angk);
+  };
+  $('#rk-prodi', el).onchange = (e) => { f.prodi = e.target.value; muat(); };
+  $('#rk-angk', el).onchange = (e) => { f.angk = e.target.value; muat(); };
+  $('#rk-seg', el).onclick = (e) => { const b = e.target.closest('button'); if (!b) return; f.saring = b.dataset.v; $$('#rk-seg button', el).forEach((x) => x.classList.toggle('on', x === b)); App.ingat('rekap', { prodi: f.prodi, angk: f.angk, saring: f.saring }); gambar(); };
+  $('#rk-q', el).oninput = debounce((e) => { f.q = e.target.value; gambar(); }, 150);
+  $('#rk-kembali', el).onclick = () => App.pergi('/perkuliahan');
+  $('#rk-xls', el).onclick = (e) => tombolProses(e.currentTarget, unduh);
+  $('#rk-riw', el).onclick = () => modalRiwayatBatch('Riwayat kelas PDDIKTI', /^PDK-/, 'Kelas PDDIKTI bisa dibatalkan selama belum ada nilai yang diisi.', muat);
+  $('#rk-buat', el).onclick = () => kelasPddikti({ prodi: f.prodi, angk: f.angk, mkIds: Array.from(pilih), setelah: muat });
+  $('#rk-isi', el).addEventListener('click', (e) => {
+    const c = e.target.closest('[data-pil]');
+    if (c) { if (c.checked) pilih.add(c.dataset.pil); else pilih.delete(c.dataset.pil); hitungPilih(); return; }
+    if (e.target.closest('a, input')) return;
+    const tr = e.target.closest('tr[data-mk]'); if (!tr || !mx) return;
+    const r = rows.find((x) => x.k.id === tr.dataset.mk); if (r) detail(r);
+  });
+  muat();
+}
+
+/* ==========================================================================
+   v1.1 — KELAS PDDIKTI LANGSUNG (tanpa MK riil)
+   o = { prodi, angk, mkIds[], status[], setelah() }
+   ========================================================================== */
+function kelasPddikti(o) {
+  o = o || {};
+  const ST = ['Lulus', 'Aktif', 'Cuti', 'Non-aktif'], stAwal = o.status || ['Lulus'];
+  const pilih = new Set(o.mkIds || []);
+  let data = null;
+  const periode = (App.M.periode || []).slice().sort((a, b) => Number(b.id) - Number(a.id));
+  const md = modal({
+    judul: 'Kelas PDDIKTI (tanpa MK riil)', lebar: 'lebar',
+    desc: 'Kelas dibuat langsung dari mata kuliah kurikulum PDDIKTI — cocok untuk mahasiswa yang sudah lulus. Setelah dibuat, isi nilainya seperti kelas biasa, lalu laporkan di menu <b>Lapor PDDIKTI</b>.',
+    isi: '<div class="fgrid c3 mb-12"><div class="field"><label>Prodi</label><select class="input" id="kp-prodi">' + opsi(App.prodi().map((x) => x.kode), o.prodi) + '</select></div>' +
+      '<div class="field"><label>Angkatan (ikut)</label><select class="input" id="kp-angk">' + opsi(App.angkatanList(), o.angk || App.angkatanList().slice(-1)[0]) + '</select></div>' +
+      '<div class="field"><label>Periode lapor</label><select class="input" id="kp-per"><option value="">Sesuai semester sebaran (disarankan)</option>' + periode.map((p) => '<option value="' + esc(p.id) + '">' + esc(labelPeriode(p.id)) + '</option>').join('') + '</select><div class="hint">MK yang sudah punya periode di Peta Klaim tetap memakai periode itu (ditandai *).</div></div>' +
+      '<div class="field full"><label>Peserta: mahasiswa berstatus</label><div class="row-wrap" id="kp-st" style="min-height:30px">' + ST.map((s) => '<label class="check"><input type="checkbox" value="' + s + '"' + (stAwal.includes(s) ? ' checked' : '') + '>' + s + '</label>').join('') +
+      '<span class="spacer"></span><label class="check"><input type="checkbox" id="kp-belum" checked>Hanya yang belum punya nilai MK tersebut</label></div></div>' +
+      '<div class="field"><label>Dosen (opsional)</label><select class="input" id="kp-dosen">' + opsi(App.M.dosen.filter((d) => String(d.aktif) !== '0').map((d) => ({ v: d.id, t: d.nama })), '', null, '— isi nanti —') + '</select></div>' +
+      '<div class="field" style="grid-column:span 2;justify-content:flex-end"><div class="row"><label class="check"><input type="checkbox" id="kp-sembunyi" checked>Sembunyikan MK tanpa calon peserta</label><span class="spacer"></span><button class="btn btn-sm" id="kp-lihat">' + ic('refresh') + 'Muat ulang daftar MK</button></div></div></div>' +
+      '<div id="kp-isi">' + skelTabel(6) + '</div>',
+    tombol: [{ teks: 'Batal', aksi: () => true }, { teks: 'Buat kelas', kelas: 'btn-primary', ikon: 'plus', aksi: async (close, m) => {
+      const ids = Array.from(pilih).filter((id) => { const r = data && data.rows.find((x) => x.mk_id === id); return r && r.tambah > 0; });
+      if (!ids.length) { toast('Pilih minimal satu mata kuliah yang punya calon peserta.', 'warn'); return false; }
+      const nPes = ids.reduce((s, id) => s + data.rows.find((x) => x.mk_id === id).tambah, 0);
+      const ok = await konfirmasi('Buat kelas PDDIKTI', 'Buat/isi kelas untuk <b>' + ids.length + ' mata kuliah</b> dengan total <b>' + nPes + ' peserta</b> (' + esc(param().prodi + ' ' + param().angkatan) + ')? Bisa dibatalkan dari Riwayat kelas PDDIKTI selama belum ada nilai.', 'Buat kelas');
+      if (!ok) return false;
+      const r = await api('kelas.pddikti', Object.assign(param(), { mk_ids: ids, dosen_id: $('#kp-dosen', m).value }));
+      if (!r.success) { toast(r.message, 'err'); return false; }
+      toast(r.message + ' Periode: ' + r.data.periode.map(labelPeriode).join(', ') + '.', 'ok', 7000);
+      if (o.setelah) o.setelah(); else App.pergi('/perkuliahan/rekap?prodi=' + encodeURIComponent(param().prodi) + '&angkatan=' + encodeURIComponent(param().angkatan));
+      return true;
+    } }]
+  });
+  const el = md.el;
+  const param = () => ({ prodi: $('#kp-prodi', el).value, angkatan: $('#kp-angk', el).value, status: $$('#kp-st input[value]:checked', el).map((c) => c.value), hanyaBelum: $('#kp-belum', el).checked, periode: $('#kp-per', el).value });
+  const gambar = () => {
+    const box = $('#kp-isi', el);
+    if (!data) return;
+    const semb = $('#kp-sembunyi', el).checked;
+    const awal = new Set(o.mkIds || []);
+    const rs = data.rows.filter((r) => !semb || r.tambah > 0 || pilih.has(r.mk_id)).sort((a, b) => (awal.has(b.mk_id) - awal.has(a.mk_id)) || (a.smt - b.smt));
+    const nCalon = data.rows.filter((r) => r.tambah > 0).length;
+    if (!rs.length) { box.innerHTML = kosong('Tidak ada mata kuliah yang perlu kelas', 'Semua mahasiswa dengan status terpilih sudah punya nilai (atau sudah menjadi peserta kelas PDDIKTI). Hilangkan centang "Hanya yang belum punya nilai" bila ingin melihat semua.', 'checkc'); hitung(); return; }
+    box.innerHTML = '<div class="row mb-8"><label class="check"><input type="checkbox" id="kp-semua">Pilih semua yang punya calon</label><span class="spacer"></span><span class="muted" id="kp-ring"></span></div>' +
+      '<div class="tbl-wrap" style="max-height:44vh"><table class="tbl tbl-compact"><thead><tr><th></th><th>Smt</th><th>Kode</th><th style="min-width:170px">Mata kuliah</th><th class="num">SKS</th><th>Bernilai</th><th class="num">Calon</th><th>Periode lapor</th><th></th></tr></thead><tbody>' +
+      rs.map((r) => '<tr class="' + (r.tambah ? '' : 'r-off') + '"><td>' + (r.tambah ? '<input type="checkbox" data-mk="' + esc(r.mk_id) + '"' + (pilih.has(r.mk_id) ? ' checked' : '') + '>' : '') + '</td><td class="center">' + esc(r.smt) + '</td><td class="mono nowrap">' + esc(r.kode) + '</td><td>' + esc(r.nama) + '</td><td class="num">' + r.sks + '</td>' +
+        '<td class="nowrap">' + (r.cnt.SD + r.cnt.SX + r.cnt.SL) + '/' + r.n + '</td><td class="num"><b>' + r.tambah + '</b></td><td class="nowrap">' + esc(labelPeriode(r.periode)) + (r.catatan.some((c) => /peta klaim/.test(c)) ? '<b title="mengikuti Peta Klaim">*</b>' : '') + ' <span class="sub">smt ' + r.smtLapor + '</span></td>' +
+        '<td title="' + esc(r.catatan.join(' · ')) + '"><div class="row-wrap" style="gap:4px">' + ketPddikti(r) + '</div></td></tr>').join('') + '</tbody></table></div>';
+    $('#kp-semua', box).onchange = (e) => { $$('[data-mk]', box).forEach((c) => { c.checked = e.target.checked; if (c.checked) pilih.add(c.dataset.mk); else pilih.delete(c.dataset.mk); }); hitung(); };
+    $('#kp-semua', box).checked = nCalon > 0 && data.rows.filter((r) => r.tambah > 0).every((r) => pilih.has(r.mk_id));
+    hitung();
+  };
+  const ketPddikti = (r) => {
+    const t = [];
+    if (r.tambah) t.push(r.kelas_id ? '<span class="pill no-dot" title="Peserta ditambahkan ke kelas PDDIKTI yang sudah ada">kelas lama</span>' : '<span class="pill no-dot brand">kelas baru</span>');
+    if (r.sumberRiil) t.push('<span class="pill no-dot" title="MK riil tetap sumber utama; MK PDDIKTI menjadi sumber cadangan">cadangan</span>');
+    if (r.smtLapor < 1 || r.smtLapor > 16) t.push('<span class="pill s-SX">di luar smt 1–16</span>');
+    return t.join(' ');
+  };
+  const hitung = () => {
+    const ring = $('#kp-ring', el); if (!ring || !data) return;
+    const ids = data.rows.filter((r) => pilih.has(r.mk_id) && r.tambah > 0);
+    ring.textContent = ids.length + ' MK dipilih · ' + ids.reduce((s, r) => s + r.tambah, 0) + ' peserta · ' + data.mhs + ' mahasiswa di angkatan ini';
+  };
+  const muat = async () => {
+    const p = param();
+    if (!p.status.length) { $('#kp-isi', el).innerHTML = kosong('Pilih status mahasiswa', '', 'users'); data = null; return; }
+    $('#kp-isi', el).innerHTML = skelTabel(6);
+    const r = await api('kelas.pddiktiCek', p);
+    if (!r.success) { $('#kp-isi', el).innerHTML = '<div class="alert danger">' + ic('xc') + '<div>' + esc(r.message) + '</div></div>'; data = null; return; }
+    data = r.data; gambar();
+  };
+  $('#kp-isi', el).addEventListener('change', (e) => { const c = e.target.closest('[data-mk]'); if (!c) return; if (c.checked) pilih.add(c.dataset.mk); else pilih.delete(c.dataset.mk); hitung(); });
+  ['#kp-prodi', '#kp-angk'].forEach((s) => { $(s, el).onchange = () => { pilih.clear(); muat(); }; });
+  $('#kp-per', el).onchange = muat; $('#kp-belum', el).onchange = muat; $('#kp-st', el).addEventListener('change', (e) => { if (e.target.hasAttribute('value')) muat(); });
+  $('#kp-sembunyi', el).onchange = gambar;
+  $('#kp-lihat', el).onclick = (e) => tombolProses(e.currentTarget, muat);
+  muat();
+}

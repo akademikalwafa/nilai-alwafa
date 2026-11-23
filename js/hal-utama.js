@@ -30,7 +30,7 @@ Hal.dasbor = {
       '<div class="card"><div class="card-h"><h3>Perlu perhatian</h3></div><div class="card-b" id="d-perhatian"><div class="skel skel-line"></div><div class="skel skel-line"></div><div class="skel skel-line"></div></div></div></div>' +
       '<div class="grid g2 mt-16"><div class="card"><div class="card-h"><h3>Rata-rata IPK per angkatan</h3></div><div class="card-b"><div class="chart-box"><canvas id="ch-ipk"></canvas></div></div></div>' +
       '<div class="card"><div class="card-h"><h3>Sebaran nilai</h3><span class="muted" style="font-size:12.5px">' + esc(labelPeriode(App.periode)) + '</span><span class="spacer"></span><select class="input input-sm" id="d-sb" style="width:220px"><option value="">Semua kelas (gabungan)</option></select></div><div class="card-b"><div class="chart-box"><canvas id="ch-sebaran"></canvas></div></div></div></div>' +
-      '<div class="card mt-16"><div class="card-h"><h3>Matriks status per angkatan</h3><span class="spacer"></span><select class="input input-sm" id="mx-prodi" style="width:auto"></select><select class="input input-sm" id="mx-angk" style="width:auto"></select><div class="seg" id="mx-mode"><button data-v="mk" class="on">Per MK</button><button data-v="mhs">Per mahasiswa</button></div></div><div class="card-b" id="mx-isi">' + kosong('Pilih prodi & angkatan', '', 'layers') + '</div></div>';
+      '<div class="card mt-16"><div class="card-h"><h3>Matriks status per angkatan</h3><span class="spacer"></span><select class="input input-sm" id="mx-prodi" style="width:auto"></select><select class="input input-sm" id="mx-angk" style="width:auto"></select><div class="seg" id="mx-mode"><button data-v="mk" class="on">Per MK</button><button data-v="mhs">Per mahasiswa</button></div><button class="btn btn-sm" id="mx-rekap" title="Rekap MK yang sudah/belum bernilai + kelas pengisinya">' + ic('layers') + 'Rekap lengkap</button></div><div class="card-b" id="mx-isi">' + kosong('Pilih prodi & angkatan', '', 'layers') + '</div></div>';
     let data = null, mode = 'mk';
     const tampil = (d) => {
       data = d;
@@ -113,6 +113,7 @@ Hal.dasbor = {
         isi: '<div class="tbl-wrap" style="max-height:60vh"><table class="tbl tbl-compact"><thead><tr><th>NIM</th><th>Nama</th><th>Kelas</th><th>Status</th><th class="num">Nilai</th><th>Huruf</th><th>Periode</th></tr></thead><tbody>' +
           rows.map((r) => '<tr><td class="mono">' + esc(r.m.nim) + '</td><td><a href="#/mahasiswa/' + encodeURIComponent(r.m.nim) + '">' + esc(r.m.nama) + '</a>' + (r.m.status !== 'Aktif' ? ' ' + pillMhs(r.m.status) : '') + '</td><td>' + kelasTag(r.m.kelas) + '</td><td>' + pillStatus(r.x[0]) + '</td><td class="num">' + fmt2(r.x[1]) + '</td><td>' + esc(r.x[0] === 'SD' || r.x[0] === 'SX' ? r.x[3] : '') + '</td><td>' + esc(labelPeriode(r.x[2] || '')) + '</td></tr>').join('') + '</tbody></table></div>' });
     });
+    $('#mx-rekap', el).onclick = () => { const pr = $('#mx-prodi', el).value, an = $('#mx-angk', el).value; App.pergi('/perkuliahan/rekap' + (pr && an ? '?prodi=' + encodeURIComponent(pr) + '&angkatan=' + encodeURIComponent(an) : '')); };
     $('#mx-mode', el).addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; mode = b.dataset.v; $$('#mx-mode button', el).forEach((x) => x.classList.toggle('on', x === b)); if (mx) gambarMatriks(); });
     $('#d-prodi', el).onchange = () => { App.ingat('dasbor', Object.assign(App.ingat('dasbor') || {}, { prodi: $('#d-prodi', el).value })); gambarProgres(); };
     $('#d-sb', el).onchange = gambarSebaran;
@@ -397,10 +398,19 @@ Hal.kurikulum = {
   prefetch() {},
   render(el, ctx, p) {
     const f = Object.assign({ tab: 'pddikti', prodi: (App.prodi()[0] || {}).kode, tahun: '', prog: '', q: '' }, App.ingat('kur') || {});
-    el.innerHTML = '<div class="page-head"><div><h2>Kurikulum & mata kuliah</h2><div class="desc">MK PDDIKTI (yang dilaporkan) dan MK riil (yang benar-benar diajarkan, termasuk MK khusus Ma\'had Aly).</div></div></div>' +
+    el.innerHTML = '<div class="page-head"><div><h2>Kurikulum & mata kuliah</h2><div class="desc">MK PDDIKTI (yang dilaporkan) dan MK riil (yang benar-benar diajarkan, termasuk MK khusus Ma\'had Aly).</div></div><span class="spacer"></span><button class="btn btn-sm btn-ghost" id="k-hapus" style="display:none">' + ic('trash') + '<span>Hapus kurikulum</span></button><button class="btn btn-sm" id="k-riw" title="Riwayat impor & pembatalan">' + ic('history') + 'Riwayat impor</button></div>' +
       '<div class="tabs" id="k-tabs"><button data-t="pddikti">' + ic('lapor') + 'MK PDDIKTI (kurikulum)</button><button data-t="riil">' + ic('clip') + 'MK riil</button></div><div id="k-isi"></div>';
-    const tabs = () => { $$('#k-tabs button', el).forEach((b) => b.classList.toggle('on', b.dataset.t === f.tab)); f.tab === 'pddikti' ? tabPddikti() : tabRiil(); App.ingat('kur', f); };
+    const tabs = () => { $$('#k-tabs button', el).forEach((b) => b.classList.toggle('on', b.dataset.t === f.tab)); f.tab === 'pddikti' ? tabPddikti() : tabRiil(); if (f.tab !== 'pddikti') $('#k-hapus', el).style.display = 'none'; App.ingat('kur', f); };
     $('#k-tabs', el).onclick = (e) => { const b = e.target.closest('button'); if (b) { f.tab = b.dataset.t; tabs(); } };
+    // v1.1: tombol kepala — Hapus kurikulum (tab PDDIKTI) & Riwayat impor (batal impor)
+    const tombolKepala = () => {
+      const b = $('#k-hapus', el), ada = f.tab === 'pddikti' && App.M.kurikulum.some((k) => k.prodi === f.prodi && String(k.tahun_kurikulum) === String(f.tahun));
+      b.style.display = ada ? '' : 'none'; b.lastChild.textContent = 'Hapus kurikulum ' + f.prodi + ' ' + f.tahun; b.title = 'Hapus MK kurikulum ' + f.tahun + ' yang belum dipakai (bisa dibatalkan)';
+    };
+    $('#k-hapus', el).onclick = () => hapusKurikulum(f.prodi, f.tahun);
+    $('#k-riw', el).onclick = () => f.tab === 'pddikti'
+      ? modalRiwayatBatch('Riwayat impor kurikulum', /^(KUR|KURDEL)-/, 'Impor yang keliru bisa dibatalkan. MK yang sudah dipakai (dipetakan / sudah dilapor) tetap dipertahankan.', () => tabs())
+      : modalRiwayatBatch('Riwayat impor MK riil', /^MKR-/, 'Impor yang keliru bisa dibatalkan. MK riil yang sudah dipakai kelas atau Peta Klaim tetap dipertahankan.', () => tabs());
     const tabPddikti = () => {
       const kur = App.M.kurikulum.filter((k) => k.prodi === f.prodi);
       const tahun = Array.from(new Set(kur.map((k) => String(k.tahun_kurikulum)))).sort().reverse();
@@ -422,6 +432,26 @@ Hal.kurikulum = {
       $('#k-q', el).oninput = debounce((e) => { f.q = e.target.value; t.cari(f.q); }, 150);
       $('#k-tambah', el).onclick = () => formMk({ prodi: f.prodi, tahun_kurikulum: f.tahun || String(App.periodeAktif).slice(0, 4), aktif: 1 });
       $('#k-impor', el).onclick = () => imporSebaran(f.prodi, f.tahun);
+      $('#k-tahun', el).addEventListener('change', tombolKepala);
+      tombolKepala();
+    };
+    const hapusKurikulum = async (prodi, tahun) => {
+      const c = await api('kurikulum.hapusCek', { prodi: prodi, tahun: tahun });
+      if (!c.success) { toast(c.message, 'err'); return; }
+      const d = c.data;
+      const tetap = d.tetap.length ? '<div class="mt-12"><div class="lbl mb-4">' + d.tetap.length + ' MK tidak dihapus karena sudah dipakai</div><div class="tbl-wrap" style="max-height:220px"><table class="tbl tbl-compact"><tbody>' + d.tetap.map((x) => '<tr><td class="mono nowrap">' + esc(x.kode) + '</td><td>' + esc(x.nama) + '</td><td class="sub">' + esc(x.alasan) + '</td></tr>').join('') + '</tbody></table></div></div>' : '';
+      if (!d.bisa) { modal({ judul: 'Kurikulum ' + tahun + ' tidak bisa dihapus', isi: '<div class="alert warn">' + ic('warn') + '<div>Semua MK di kurikulum ini sudah dipakai (dipetakan di Peta Klaim atau sudah dilapor).</div></div>' + tetap }); return; }
+      const ok = await new Promise((resolve) => {
+        let jadi = false;
+        modal({ judul: 'Hapus kurikulum ' + prodi + ' ' + tahun, isi: '<div class="ringkas-batal"><div><b>' + d.bisa + '</b><span>MK akan dihapus</span></div><div><b>' + d.tetap.length + '</b><span>MK dipertahankan</span></div><div><b>' + d.total + '</b><span>MK di kurikulum ini</span></div></div>' + tetap +
+          '<div class="alert info mt-12">' + ic('info') + '<div>Penghapusan tercatat di <b>Riwayat impor</b> dan masih bisa dibatalkan (MK dikembalikan dengan data yang sama).</div></div><div class="field mt-12"><label>Ketik <b>HAPUS</b> untuk melanjutkan</label><input class="input" id="hk-in" autocomplete="off"></div>',
+          tombol: [{ teks: 'Batal', aksi: () => true }, { teks: 'Hapus ' + d.bisa + ' MK', kelas: 'btn-danger', aksi: (close, m) => { if ($('#hk-in', m).value.trim() !== 'HAPUS') { toast('Ketik HAPUS untuk konfirmasi.', 'warn'); return false; } jadi = true; return true; } }],
+          onTutup: () => resolve(jadi) });
+      });
+      if (!ok) return;
+      const r = await api('kurikulum.hapus', { prodi: prodi, tahun: tahun, konfirmasi: 'HAPUS' });
+      toast(r.message, r.success ? 'ok' : 'err', 6000);
+      if (r.success) { await App.segarkanMaster(); f.tahun = ''; tabs(); }
     };
     const formMk = (r) => {
       const baru = !r.id;
@@ -440,9 +470,9 @@ Hal.kurikulum = {
         tombol: [{ teks: 'Batal', aksi: () => true }, { teks: 'Impor', kelas: 'btn-primary', aksi: async (close, m) => {
           if (!rows.length) { toast('Belum ada baris terbaca.', 'warn'); return false; }
           const isi = rows.map((x) => Object.assign({ prodi: $('#is-prodi', m).value, tahun_kurikulum: $('#is-tahun', m).value.trim() }, x));
-          const res = await api('master.impor', { tabel: 'Kurikulum', rows: isi });
+          const res = await api('master.impor', { tabel: 'Kurikulum', rows: isi, file: namaFile });
           if (!res.success) { toast(res.message, 'err'); return false; }
-          await App.segarkanMaster(); toast(res.data.ditambah + ' MK ditambah, ' + res.data.diperbarui + ' diperbarui.'); f.prodi = $('#is-prodi', m).value; f.tahun = $('#is-tahun', m).value.trim(); tabs(); return true;
+          await App.segarkanMaster(); toast(res.data.ditambah + ' MK ditambah, ' + res.data.diperbarui + ' diperbarui.' + (res.data.batch ? ' Salah file? Batalkan lewat "Riwayat impor".' : ''), 'ok', res.data.batch ? 6000 : undefined); f.prodi = $('#is-prodi', m).value; f.tahun = $('#is-tahun', m).value.trim(); tabs(); return true;
         } }] });
       let wb = null;
       const baca = async () => {
@@ -460,8 +490,9 @@ Hal.kurikulum = {
         });
         $('#is-prev', md.el).innerHTML = '<div class="row mb-8"><b>' + rows.length + ' MK</b><span class="muted">· ' + rows.reduce((s, x) => s + x.sks, 0) + ' SKS · ' + rows.filter((x) => x.jenis).length + ' ditandai seminar/skripsi</span></div><div class="tbl-wrap" style="max-height:300px"><table class="tbl tbl-compact"><thead><tr><th>Smt</th><th>Kode</th><th>Mata kuliah</th><th class="num">SKS</th><th>Jenis</th></tr></thead><tbody>' + rows.map((x) => '<tr><td class="center">' + esc(x.smt_sebaran) + '</td><td class="mono">' + esc(x.kode_mk) + '</td><td>' + esc(x.nama_mk) + '</td><td class="num">' + x.sks + '</td><td>' + esc(x.jenis) + '</td></tr>').join('') + '</tbody></table></div>';
       };
+      let namaFile = '';
       pasangDrop($('#is-drop', md.el), $('#is-file', md.el), async (file) => {
-        wb = await Excel.baca(file);
+        wb = await Excel.baca(file); namaFile = file.name;
         const s = $('#is-sheet', md.el);
         s.innerHTML = opsi(wb.SheetNames, wb.SheetNames.find((n) => /home \(2\)|sebaran/i.test(n)) || wb.SheetNames[0]); s.disabled = false;
         s.onchange = baca; await baca();
@@ -469,7 +500,7 @@ Hal.kurikulum = {
     };
     const tabRiil = () => {
       $('#k-isi', el).innerHTML = '<div class="card"><div class="toolbar"><select class="input" id="r-prodi">' + opsi(App.prodi().map((x) => ({ v: x.kode, t: x.kode + ' — ' + x.nama })), f.prodi) + '</select><select class="input" id="r-prog">' + opsi(Object.keys(PROGRAM_LABEL).map((k) => ({ v: k, t: PROGRAM_LABEL[k] })), f.prog, null, 'Semua program') + '</select><div class="search" style="width:220px">' + ic('search') + '<input class="input" id="r-q" placeholder="Cari nama MK…"></div><span class="spacer"></span><button class="btn btn-sm" id="r-impor">' + ic('upload') + 'Impor Excel</button><button class="btn btn-sm btn-primary" id="r-tambah">' + ic('plus') + 'Tambah MK riil</button></div><div id="r-tbl"></div></div>' +
-        '<div class="alert info mt-12">' + ic('info') + '<div>Kelas otomatis dibuat dari MK riil yang <b>semester ajar</b>-nya cocok dengan semester angkatan dan programnya cocok dengan program mahasiswa. MK Ma\'had Aly cukup diberi program "Ma\'had Aly".</div></div>';
+        '<div class="muted mt-8" id="r-cermin" style="font-size:12.5px"></div><div class="alert info mt-12">' + ic('info') + '<div>Kelas otomatis dibuat dari MK riil yang <b>semester ajar</b>-nya cocok dengan semester angkatan dan programnya cocok dengan program mahasiswa. MK Ma\'had Aly cukup diberi program "Ma\'had Aly".</div></div>';
       const t = Tabel($('#r-tbl', el), { id: (r) => r.id, urut: 'smt_ajar', semua: true, tinggi: true, kolom: [
         { k: 'smt_ajar', label: 'Smt ajar', cls: 'center', val: (r) => Number(r.smt_ajar) },
         { k: 'nama_mk', label: 'Nama MK riil' },
@@ -478,7 +509,11 @@ Hal.kurikulum = {
         { k: 'catatan', label: 'Catatan', html: (r) => '<span class="sub">' + esc(r.catatan || '') + '</span>' },
         { k: 'aktif', label: 'Status', html: (r) => String(r.aktif) === '0' ? '<span class="pill">Nonaktif</span>' : '<span class="pill st-Aktif">Aktif</span>' }
       ], cari: (r) => r.nama_mk, klik: (r) => formRiil(r), kosong: 'Belum ada MK riil', kosongDesc: 'Tambahkan MK yang benar-benar diajarkan.' });
-      const isi = () => { t.set(App.M.mkriil.filter((m) => m.prodi === f.prodi && (!f.prog || String(m.program).split(',').includes(f.prog)))); };
+      const isi = () => {
+        const cermin = App.M.mkriil.filter((m) => m.prodi === f.prodi && /^pd-/.test(m.id)).length;   // v1.1: MK cermin kelas PDDIKTI disembunyikan
+        $('#r-cermin', el).textContent = cermin ? cermin + ' MK cermin dari fitur "Kelas PDDIKTI" (tanpa MK riil) disembunyikan dari daftar ini.' : '';
+        t.set(App.M.mkriil.filter((m) => m.prodi === f.prodi && !/^pd-/.test(m.id) && (!f.prog || String(m.program).split(',').includes(f.prog))));
+      };
       isi();
       $('#r-prodi', el).onchange = (e) => { f.prodi = e.target.value; App.ingat('kur', f); isi(); };
       $('#r-prog', el).onchange = (e) => { f.prog = e.target.value; App.ingat('kur', f); isi(); };
@@ -506,7 +541,7 @@ Hal.kurikulum = {
           if (!rows.length) { toast('Belum ada data.', 'warn'); return false; }
           const res = await api('master.impor', { tabel: 'MK_Riil', rows: rows.map((x) => Object.assign({ prodi: $('#ir-prodi', m).value }, x)) });
           if (!res.success) { toast(res.message, 'err'); return false; }
-          await App.segarkanMaster(); toast(res.data.ditambah + ' ditambah, ' + res.data.diperbarui + ' diperbarui.'); tabs(); return true;
+          await App.segarkanMaster(); toast(res.data.ditambah + ' ditambah, ' + res.data.diperbarui + ' diperbarui.' + (res.data.batch ? ' Salah file? Batalkan lewat "Riwayat impor".' : ''), 'ok', res.data.batch ? 6000 : undefined); tabs(); return true;
         } }] });
       $('#ir-templat', md.el).onclick = () => Excel.tulisSederhana('Templat-MK-Riil.xlsx', ['Nama MK', 'SKS', 'Semester', 'Program', 'Catatan'], [['Nahwu I', 2, 1, "Ma'had Aly", ''], ['Fiqh Muamalah', 3, 3, 'Reguler, Hybrid', '']]);
       pasangDrop($('#ir-drop', md.el), $('#ir-file', md.el), async (file) => {

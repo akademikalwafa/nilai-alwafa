@@ -4,7 +4,7 @@
    UI kit: toast, modal, konfirmasi ketik, tabel, skeleton, cetak A4, lazy-lib
    ========================================================================== */
 'use strict';
-const APP_VER = '1.0.0';
+const APP_VER = '1.1.0';
 const $ = (s, el) => (el || document).querySelector(s);
 const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
 const esc = (v) => String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -51,7 +51,8 @@ const GAS_URL = String(CONF.GAS_URL || '');
 const KONFIG_OK = /^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(GAS_URL) && !/GANTI|XXXX/.test(GAS_URL);
 const READ = new Set(['ping', 'boot', 'auth.me', 'master.get', 'pengaturan.get', 'log.list', 'mhs.list', 'mhs.detail', 'mhs.cekPindah', 'kelas.list', 'nilai.get',
   'klaim.get', 'lapor.kelas', 'lapor.detail', 'mahad.rekap', 'lulus.list', 'lulus.get', 'cetak.khs', 'cetak.transkrip', 'dasbor.ringkasan', 'dasbor.matriks',
-  'dasbor.sebaran', 'batch.list', 'doc.templateList', 'doc.pejabatList', 'doc.list', 'doc.antrean']);
+  'dasbor.sebaran', 'batch.list', 'doc.templateList', 'doc.pejabatList', 'doc.list', 'doc.antrean',
+  'kelas.angkatan', 'kelas.pddiktiCek', 'batch.cekBatal', 'kurikulum.hapusCek']);   // v1.1
 const Net = {
   n: 0,
   bar() { return $('#netbar'); },

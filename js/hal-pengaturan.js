@@ -246,12 +246,54 @@ function SetSinkron(box, ctx) {
 }
 function riwayatBatch(rows, semua) {
   const r = (rows || []).filter((b) => semua || /^MIG-/.test(b.id));
-  return r.length ? '<div class="tbl-wrap" style="max-height:340px"><table class="tbl tbl-compact"><thead><tr><th>Waktu</th><th>Jenis</th><th>Sumber</th><th class="num">Berhasil</th><th class="num">Dilewati</th><th>Oleh</th><th></th></tr></thead><tbody>' + r.map((b) => '<tr' + (b.dibatalkan ? ' class="r-off"' : '') + '><td class="nowrap">' + esc(fmtWaktu(b.at)) + '</td><td><span class="pill no-dot ' + (/^MIG/.test(b.jenis) ? 'info' : 'brand') + '">' + esc(b.jenis) + '</span></td><td>' + esc(b.sumber) + '<div class="sub mono">' + esc(b.id) + '</div></td><td class="num">' + fmtInt(b.berhasil) + '</td><td class="num">' + fmtInt(b.dilewati) + '</td><td>' + esc(b.oleh) + '</td><td class="aksi">' + (b.dibatalkan ? '<span class="sub">dibatalkan ' + esc(fmtWaktu(String(b.dibatalkan).slice(0, 19))) + '</span>' : /^MIG-/.test(b.id) ? '<button class="btn btn-xs" data-batal="' + esc(b.id) + '">' + ic('repeat', 'ic-sm') + 'Batalkan</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>' : kosong('Belum ada riwayat', '', 'history');
+  return r.length ? '<div class="tbl-wrap" style="max-height:340px"><table class="tbl tbl-compact"><thead><tr><th>Waktu</th><th>Jenis</th><th>Sumber</th><th class="num">Berhasil</th><th class="num">Dilewati</th><th>Oleh</th><th></th></tr></thead><tbody>' + r.map((b) => '<tr' + (b.dibatalkan ? ' class="r-off"' : '') + '><td class="nowrap">' + esc(fmtWaktu(b.at)) + '</td><td><span class="pill no-dot ' + (/^MIG/.test(b.jenis) ? 'info' : 'brand') + '">' + esc(b.jenis) + '</span></td><td>' + esc(b.sumber) + '<div class="sub mono">' + esc(b.id) + '</div></td><td class="num">' + fmtInt(b.berhasil) + '</td><td class="num">' + fmtInt(b.dilewati) + '</td><td>' + esc(b.oleh) + '</td><td class="aksi">' + (b.dibatalkan ? '<span class="sub">dibatalkan ' + esc(fmtWaktu(String(b.dibatalkan).slice(0, 19))) + '</span>' : /^(MIG|KUR|MKR|KURDEL|PDK)-/.test(b.id) ? '<button class="btn btn-xs" data-batal="' + esc(b.id) + '">' + ic('repeat', 'ic-sm') + 'Batalkan</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>' : kosong('Belum ada riwayat', '', 'history');
 }
 async function batalBatch(id, after) {
+  if (!/^MIG-/.test(id)) return batalBatchUmum(id, after);          // v1.1: KUR/MKR/KURDEL/PDK
   const ok = await konfirmasiKetik({ judul: 'Batalkan migrasi', kata: 'BATAL', bahaya: true, tombolTeks: 'Batalkan batch', pesan: 'Semua nilai riil, nilai lapor, kelas, dan peta klaim dari batch <b>' + esc(id) + '</b> akan dihapus. Data induk (MK riil, dosen) yang dibuat tetap ada.' });
   if (!ok) return;
   const r = await api('migrasi.batal', { batch: id }); toast(r.message, r.success ? 'ok' : 'err', 6000); if (after) after();
+}
+
+/* ---------------------------------------------------------------- v1.1: pembatalan batch impor kurikulum / MK riil / hapus kurikulum / kelas PDDIKTI */
+const JENIS_BATCH_V11 = { KUR: 'Impor kurikulum', MKR: 'Impor MK riil', KURDEL: 'Hapus kurikulum', PDK: 'Kelas PDDIKTI' };
+async function batalBatchUmum(id, after) {
+  const c = await api('batch.cekBatal', { batch: id });
+  if (!c.success) { toast(c.message, 'err'); return; }
+  const d = c.data, R = d.ringkas, jenis = id.split('-')[0];
+  const kotak = (n, t) => '<div><b>' + fmtInt(n) + '</b><span>' + esc(t) + '</span></div>';
+  const isiRingkas = jenis === 'PDK'
+    ? kotak(R.kelas, 'kelas dihapus') + kotak(R.peserta, 'peserta dihapus') + kotak(R.peta, 'aturan peta dikembalikan') + kotak(R.bernilai, 'peserta sudah bernilai')
+    : kotak(R.dihapus, 'MK dihapus') + kotak(R.dipulihkan, 'MK dikembalikan ke data lama') + kotak(R.dikembalikan, 'MK yang dihapus dipulihkan') + kotak(R.dipertahankan, 'MK dipertahankan (sudah dipakai)');
+  const tetap = (d.tetap || []).length ? '<div class="mt-12"><div class="lbl mb-4">Dipertahankan karena sudah dipakai</div><div class="tbl-wrap" style="max-height:200px"><table class="tbl tbl-compact"><tbody>' + d.tetap.map((x) => '<tr><td class="mono nowrap">' + esc(x.kode) + '</td><td>' + esc(x.nama) + '</td><td class="sub">' + esc(x.alasan) + '</td></tr>').join('') + '</tbody></table></div></div>' : '';
+  if (!d.bisa) {
+    modal({ judul: 'Tidak bisa dibatalkan', isi: '<div class="alert warn mb-12">' + ic('warn') + '<div>' + esc(d.pesan || 'Batch ini tidak bisa dibatalkan.') + '</div></div><div class="ringkas-batal">' + isiRingkas + '</div>' + tetap });
+    return;
+  }
+  const ok = await new Promise((resolve) => {
+    let jadi = false;
+    modal({ judul: 'Batalkan ' + (JENIS_BATCH_V11[jenis] || 'batch'), desc: esc(d.sumber || '') + ' · <span class="mono">' + esc(id) + '</span>',
+      isi: '<div class="ringkas-batal">' + isiRingkas + '</div>' + tetap + '<div class="field mt-16"><label>Ketik <b>BATAL</b> untuk melanjutkan</label><input class="input" id="bb-in" autocomplete="off"></div>',
+      tombol: [{ teks: 'Tutup', aksi: () => true }, { teks: 'Batalkan batch', kelas: 'btn-danger', aksi: (close, m) => { if ($('#bb-in', m).value.trim() !== 'BATAL') { toast('Ketik BATAL untuk konfirmasi.', 'warn'); return false; } jadi = true; return true; } }],
+      onTutup: () => resolve(jadi) });
+  });
+  if (!ok) return;
+  const r = await api('batch.batal', { batch: id, konfirmasi: 'BATAL' });
+  toast(r.message, r.success ? 'ok' : 'err', 7000);
+  if (r.success && (jenis === 'KUR' || jenis === 'MKR' || jenis === 'KURDEL' || jenis === 'PDK')) await App.segarkanMaster();
+  if (after) after();
+}
+/** Modal riwayat batch tertentu (dipakai halaman Kurikulum & Rekap angkatan). */
+function modalRiwayatBatch(judul, re, catatan, after) {
+  const md = modal({ judul: judul, lebar: 'lebar', desc: catatan || '', isi: skelTabel(4), tombol: [{ teks: 'Tutup', aksi: () => true }] });
+  const box = $('.modal-b', md.el);
+  const muat = async () => {
+    const r = await api('batch.list', { _fresh: true });
+    if (!r.success) { box.innerHTML = '<div class="alert danger">' + ic('xc') + '<div>' + esc(r.message) + '</div></div>'; return; }
+    box.innerHTML = riwayatBatch((r.data.batch || []).filter((b) => re.test(b.id)), true);
+  };
+  box.addEventListener('click', (e) => { const b = e.target.closest('[data-batal]'); if (b) batalBatch(b.dataset.batal, () => { Store.basi(); muat(); if (after) after(); }); });
+  muat();
 }
 
 /* ---------------------------------------------------------------- migrasi Excel lama */
