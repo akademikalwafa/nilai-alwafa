@@ -46,8 +46,8 @@ function HalKelasKartu(el, ctx, q) {
     '<div class="stepper">' + stepper + '</div><button class="btn" id="kk-tabel" title="Semua kelas periode ini dalam satu tabel">' + ic('list') + 'Tampilan tabel</button></div>' +
     '<div class="card kk-periode"><div style="min-width:0"><div class="kk-label">Periode yang sedang dikerjakan</div><div class="row" style="gap:10px;flex-wrap:wrap"><span class="kk-ta">T.A. ' + th + '/' + (th + 1) + '</span><span class="pill no-dot kk-jenis">' + jenis.toUpperCase() + '</span>' +
     (per === String(App.periodeAktif) ? '<span class="pill st-Aktif">periode aktif</span>' : '<span class="pill no-dot">bukan periode aktif</span>') + '</div><div class="muted mt-4">Kelas dan nilai di halaman ini milik periode ' + esc(labelPeriode(per)) + '. Ganti periode lewat pilihan di kanan atas.</div></div><span class="spacer"></span><div class="kk-ring" id="kk-ring"></div><button class="btn btn-sm" id="kk-per">' + ic('cal', 'ic-sm') + 'Ubah periode</button></div>' +
-    '<div class="card kk-aksi"><div class="kk-ikon">' + ic('layers') + '</div><div style="flex:1;min-width:240px"><b>Buat &amp; kelola kelas</b><div class="muted">Kelas otomatis disusun dari MK riil yang semester ajarnya cocok. Untuk mahasiswa yang sudah lulus tanpa MK riil, pakai <b>Kelas PDDIKTI</b>.</div></div>' +
-    '<div class="row-wrap"><button class="btn" id="k-rekap" title="Mata kuliah apa saja yang sudah/belum bernilai di satu angkatan">' + ic('layers') + 'Rekap angkatan</button><button class="btn" id="k-pddikti" title="Kelas langsung dari MK kurikulum PDDIKTI, tanpa MK riil">' + ic('lapor') + 'Kelas PDDIKTI</button><button class="btn" id="k-tambah">' + ic('plus') + 'Tambah kelas</button><button class="btn btn-primary" id="k-gen">' + ic('spark') + 'Buat kelas otomatis</button></div></div>' +
+    '<div class="card kk-aksi"><div class="kk-ikon">' + ic('layers') + '</div><div style="flex:1;min-width:240px"><b>Buat &amp; kelola kelas</b><div class="muted">Kelas otomatis disusun dari MK riil yang semester ajarnya cocok. Untuk mahasiswa yang sudah lulus tanpa MK riil, pakai <b>Kelas PDDIKTI</b> — atau <b>Unggah nilai</b> dari file nilai per mahasiswa.</div></div>' +
+    '<div class="row-wrap"><button class="btn" id="k-rekap" title="Mata kuliah apa saja yang sudah/belum bernilai di satu angkatan">' + ic('layers') + 'Rekap angkatan</button><button class="btn" id="k-pddikti" title="Kelas langsung dari MK kurikulum PDDIKTI, tanpa MK riil">' + ic('lapor') + 'Kelas PDDIKTI</button><button class="btn" id="k-unggah" title="File nilai per mahasiswa (transkrip/KHS, satu sheet = satu mahasiswa) → nilai masuk ke semua mata kuliah yang sesuai">' + ic('upload') + 'Unggah nilai (Excel)</button><button class="btn" id="k-tambah">' + ic('plus') + 'Tambah kelas</button><button class="btn btn-primary" id="k-gen">' + ic('spark') + 'Buat kelas otomatis</button></div></div>' +
     '<div class="row kk-sec"><h3 id="kk-judul"></h3><span class="pill no-dot" id="kk-jml"></span><span class="spacer"></span><span id="kk-alat" class="row" style="gap:8px"></span></div><div class="kk-grid" id="kk-isi">' + '<div class="k-card skel" style="height:300px"></div>'.repeat(4) + '</div></div>';
   const root = $('#kk', el);                                         // pendengar dipasang di elemen halaman (bukan #konten yang dipakai ulang)
   let K = null, M = null;
@@ -69,7 +69,8 @@ function HalKelasKartu(el, ctx, q) {
     return '<div class="k-card" data-angk="' + esc(a) + '"><div class="row"><span class="k-tag abu">Lewat 8 semester</span><span class="spacer"></span><span class="pill no-dot">smt ' + s + '</span></div>' +
       '<div class="k-tahun">' + esc(a) + '</div><div class="k-sub">Tahun masuk ' + esc(a) + ' · ' + fmtInt(ms.length) + ' mahasiswa</div>' +
       '<div class="k-box">' + r('Lulus', fmtInt(lulus)) + r('Belum ditandai lulus', belum ? '<span style="color:var(--warn)">' + fmtInt(belum) + '</span>' : '0') + r('Kelas periode ini', ks.length) + '</div>' +
-      (belum && typeof tandaiLulus === 'function' ? '<button class="btn btn-sm btn-ghost" data-lulus="' + esc(a) + '">' + ic('lulus', 'ic-sm') + 'Tandai lulus…</button>' : '') +
+      '<div class="row-wrap" style="gap:4px">' + (belum && typeof tandaiLulus === 'function' ? '<button class="btn btn-sm btn-ghost" data-lulus="' + esc(a) + '">' + ic('lulus', 'ic-sm') + 'Tandai lulus…</button>' : '') +
+      '<button class="btn btn-sm btn-ghost" data-unm="' + esc(a) + '" title="Unggah file nilai per mahasiswa (transkrip/KHS)">' + ic('upload', 'ic-sm') + 'Unggah nilai…</button></div>' +
       '<div class="row k-dua"><button class="btn btn-blok" data-rekap="' + esc(a) + '">' + ic('layers', 'ic-sm') + 'Rekap nilai</button><button class="btn btn-primary btn-blok" data-pdk="' + esc(a) + '">' + ic('lapor', 'ic-sm') + 'Kelas PDDIKTI</button></div>' +
       '<a class="kk-link" href="' + keAngk(a) + '">Lihat kelas per prodi ' + ic('next', 'ic-sm') + '</a></div>';
   };
@@ -124,7 +125,7 @@ function HalKelasKartu(el, ctx, q) {
     $('#kk-judul', el).textContent = 'Kelas ' + prodi + ' · Angkatan ' + angk + ' (semester ' + smt(angk) + ')';
     $('#kk-jml', el).textContent = ks.length + ' kelas';
     $('#kk-alat', el).innerHTML = (progs.length > 1 ? '<div class="seg" id="kk-prog"><button data-v=""' + (!saringProg ? ' class="on"' : '') + '>Semua</button>' + progs.map((x) => '<button data-v="' + esc(x) + '"' + (saringProg === x ? ' class="on"' : '') + '>' + esc(x === 'PDDIKTI' ? 'PDDIKTI' : progLabel(x)) + '</button>').join('') + '</div>' : '') +
-      '<div class="search" style="width:200px">' + ic('search') + '<input class="input" id="kk-q" placeholder="Cari MK / dosen…" value="' + esc(cari) + '"></div><button class="btn btn-sm" data-aksi="rekap1">' + ic('layers', 'ic-sm') + 'Rekap nilai</button><button class="btn btn-sm" data-aksi="tambah1">' + ic('plus', 'ic-sm') + 'Tambah kelas</button>';
+      '<div class="search" style="width:200px">' + ic('search') + '<input class="input" id="kk-q" placeholder="Cari MK / dosen…" value="' + esc(cari) + '"></div><button class="btn btn-sm" data-aksi="rekap1">' + ic('layers', 'ic-sm') + 'Rekap nilai</button><button class="btn btn-sm" data-aksi="unm1" title="Unggah file nilai per mahasiswa">' + ic('upload', 'ic-sm') + 'Unggah nilai</button><button class="btn btn-sm" data-aksi="tambah1">' + ic('plus', 'ic-sm') + 'Tambah kelas</button>';
     gambarKelas(ks);
     const qi = $('#kk-q', el); if (qi) qi.oninput = debounce(() => { cari = qi.value; gambarKelas(ks); }, 150);
   };
@@ -132,23 +133,25 @@ function HalKelasKartu(el, ctx, q) {
     const qn = normNama(cari);
     const rs = ks.filter((k) => (!saringProg || (saringProg === 'PDDIKTI' ? /^pd-/.test(k.mk_riil_id) : k.program === saringProg && !/^pd-/.test(k.mk_riil_id))) && (!qn || normNama(k.mk + ' ' + (k.dosen || '')).includes(qn)));
     $('#kk-isi', el).innerHTML = rs.length ? rs.map(kartuKelas).join('') : '<div class="k-penuh">' + kosong(ks.length ? 'Tidak ada kelas yang cocok' : 'Belum ada kelas ' + prodi + ' angkatan ' + angk, ks.length ? 'Ubah saringan atau kata kunci.' : 'Di periode ' + esc(labelPeriode(per)) + ' belum ada kelas untuk ' + esc(prodiNama(prodi)) + ' angkatan ' + esc(angk) + '.', 'clip') +
-      (ks.length ? '' : '<div class="row" style="justify-content:center;gap:8px;margin-top:-8px"><button class="btn" data-aksi="tambah1">' + ic('plus', 'ic-sm') + 'Tambah kelas</button><button class="btn" data-aksi="pdk1">' + ic('lapor', 'ic-sm') + 'Kelas PDDIKTI</button><button class="btn btn-primary" data-aksi="gen">' + ic('spark', 'ic-sm') + 'Buat kelas otomatis</button></div>') + '</div>';
+      (ks.length ? '' : '<div class="row" style="justify-content:center;gap:8px;margin-top:-8px"><button class="btn" data-aksi="tambah1">' + ic('plus', 'ic-sm') + 'Tambah kelas</button><button class="btn" data-aksi="pdk1">' + ic('lapor', 'ic-sm') + 'Kelas PDDIKTI</button><button class="btn" data-aksi="unm1">' + ic('upload', 'ic-sm') + 'Unggah nilai</button><button class="btn btn-primary" data-aksi="gen">' + ic('spark', 'ic-sm') + 'Buat kelas otomatis</button></div>') + '</div>';
   };
   pakai(ctx, 'kelas.list', { periode: per }, (d) => { K = d; gambar(); });
   pakai(ctx, 'mhs.list', {}, (d) => { M = d; gambar(); });
   const prodiPilih = () => prodi || (App.prodi()[0] || {}).kode;
   root.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-aksi],[data-rekap],[data-pdk],[data-lulus],#kk-prog button');
+    const b = e.target.closest('[data-aksi],[data-rekap],[data-pdk],[data-lulus],[data-unm],#kk-prog button');
     if (!b) return;
     if (b.closest('#kk-prog')) { saringProg = b.dataset.v; $$('#kk-prog button', el).forEach((x) => x.classList.toggle('on', x === b)); gambarKelas(kelasDari(angk, prodi).sort((a, c) => String(a.mk).localeCompare(String(c.mk)))); return; }
     if (b.dataset.rekap) return App.pergi('/perkuliahan/rekap?prodi=' + encodeURIComponent(prodiPilih()) + '&angkatan=' + encodeURIComponent(b.dataset.rekap));
     if (b.dataset.pdk) return kelasPddikti({ prodi: prodiPilih(), angk: b.dataset.pdk, status: ['Lulus'] });
     if (b.dataset.lulus) return tandaiLulus({ angk: b.dataset.lulus, setelah: () => App.render() });
+    if (b.dataset.unm) return unggahNilaiMhs({ angk: b.dataset.unm, setelah: () => App.render() });   // v1.3
     const a = b.dataset.aksi;
     if (a === 'gen') buatKelasOtomatis(prodiPilih());
     if (a === 'tambah1') tambahKelas(prodiPilih(), angk);
     if (a === 'rekap1') App.pergi('/perkuliahan/rekap?prodi=' + encodeURIComponent(prodi) + '&angkatan=' + encodeURIComponent(angk));
     if (a === 'pdk1') kelasPddikti({ prodi: prodi, angk: angk });
+    if (a === 'unm1') unggahNilaiMhs({ angk: angk, prodi: prodi, setelah: () => App.render() });
   });
   root.addEventListener('mouseover', (e) => { const c = e.target.closest('.k-kelas'); if (c && !c._pf) { c._pf = 1; prefetch('nilai.get', { kelas_id: c.dataset.id }); } });
   $('#kk-tabel', el).onclick = () => { App.ingat('kls', { prodi: prodi, angk: angk, q: '' }); App.pergi('/perkuliahan?tampil=tabel'); };
@@ -157,6 +160,7 @@ function HalKelasKartu(el, ctx, q) {
   $('#k-tambah', el).onclick = () => tambahKelas(prodiPilih(), angk);
   $('#k-rekap', el).onclick = () => App.pergi('/perkuliahan/rekap' + (angk ? '?prodi=' + encodeURIComponent(prodiPilih()) + '&angkatan=' + encodeURIComponent(angk) : ''));
   $('#k-pddikti', el).onclick = () => kelasPddikti({ prodi: prodiPilih(), angk: angk });
+  $('#k-unggah', el).onclick = () => unggahNilaiMhs({ angk: angk, prodi: prodi, setelah: () => App.render() });   // v1.3
 }
 const unikk = (a) => Array.from(new Set(a.filter((x) => x !== '' && x !== undefined && x !== null)));
 
@@ -251,7 +255,7 @@ function HalNilai(el, ctx, kelasId) {
       (D.klaim.length ? '<span class="pill brand no-dot" title="Diklaim untuk MK PDDIKTI">' + ic('route', 'ic-sm') + ' ' + esc(D.klaim.join(' · ')) + '</span>' : '<a class="pill warn no-dot" href="#/klaim?prodi=' + esc(k.prodi) + '&angkatan=' + esc(k.ikut_angkatan) + '">' + ic('warn', 'ic-sm') + ' Belum diklaim ke MK PDDIKTI</a>') + '</div></div>' +
       '<div class="field" style="width:280px"><label>Dosen pengampu</label><select class="input" id="nv-dosen">' + opsi(App.M.dosen.filter((x) => String(x.aktif) !== '0' || x.id === k.dosen_id).map((x) => ({ v: x.id, t: x.nama })), k.dosen_id, null, '— pilih dosen —') + '</select></div></div>' +
       '<div class="row-wrap mt-12" style="gap:18px"><span><b>' + rows.length + '</b> <span class="muted">peserta</span></span><span><b>' + terisi + '</b> <span class="muted">bernilai</span></span><span><b>' + kunci + '</b> <span class="muted">sudah dilapor (terkunci)</span></span><span id="nv-rata" class="muted"></span></div></div></div>' +
-      '<div class="card mt-16"><div class="toolbar"><button class="btn btn-sm" id="nv-tempel">' + ic('paste') + 'Tempel dari Excel</button><button class="btn btn-sm" id="nv-unggah">' + ic('upload') + 'Unggah Excel</button><input type="file" id="nv-file" accept=".xlsx,.xls,.csv" hidden><button class="btn btn-sm" id="nv-templat">' + ic('download') + 'Unduh daftar</button><button class="btn btn-sm" id="nv-peserta">' + ic('users') + 'Peserta</button><span class="spacer"></span><span class="muted" style="font-size:12.5px"><span class="kbd">↑</span><span class="kbd">↓</span>/<span class="kbd">Enter</span> pindah baris · tempel kolom nilai langsung ke sel</span></div>' +
+      '<div class="card mt-16"><div class="toolbar"><button class="btn btn-sm" id="nv-tempel">' + ic('paste') + 'Tempel dari Excel</button><button class="btn btn-sm" id="nv-unggah">' + ic('upload') + 'Unggah Excel</button><input type="file" id="nv-file" accept=".xlsx,.xls,.csv" hidden><button class="btn btn-sm" id="nv-templat" title="Daftar nilai kelas ini dalam format impor nilai Neo Feeder (kode & nama MK PDDIKTI, semester, nama kelas, prodi)">' + ic('download') + 'Unduh daftar</button><button class="btn btn-sm" id="nv-peserta">' + ic('users') + 'Peserta</button><span class="spacer"></span><span class="muted" style="font-size:12.5px"><span class="kbd">↑</span><span class="kbd">↓</span>/<span class="kbd">Enter</span> pindah baris · tempel kolom nilai langsung ke sel</span></div>' +
       '<div class="tbl-wrap tall"><table class="sheet" id="nv-grid"><thead><tr><th style="width:44px">No</th><th style="width:130px">NIM</th><th>Nama mahasiswa</th><th style="width:110px">Status</th><th style="width:120px;text-align:right">Nilai akhir</th><th style="width:70px">Huruf</th><th style="width:70px;text-align:right">Indeks</th><th style="width:170px">Lapor PDDIKTI</th></tr></thead><tbody>' +
       rows.map((r, i) => {
         const v = ubah[r.nim] !== undefined ? ubah[r.nim] : r.akhir, sk = skala(parseAngka(v));
@@ -291,7 +295,7 @@ function HalNilai(el, ctx, kelasId) {
     $('#nv-tempel', el).onclick = () => modalTempel();
     $('#nv-unggah', el).onclick = () => $('#nv-file', el).click();
     $('#nv-file', el).onchange = async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { pratinjauTabel(await bacaFileNilai(f), 'unggah'); } catch (err) { toast(err.message, 'err'); } };
-    $('#nv-templat', el).onclick = () => Excel.tulisSederhana('Nilai_' + k.mk.replace(/[^\w]+/g, '_') + '_' + k.ikut_angkatan + '.xlsx', ['No', 'NIM', 'Nama', 'Nilai Akhir'], D.rows.map((r, i) => [i + 1, r.nim, r.nama, r.akhir === null ? '' : r.akhir]), 'Nilai');
+    $('#nv-templat', el).onclick = (e) => tombolProses(e.currentTarget, () => unduhDaftarFeeder(k, kelasId));   // v1.3: format impor nilai Neo Feeder
     $('#nv-peserta', el).onclick = () => kelolaPeserta();
   };
   const statusBar = () => {
@@ -521,10 +525,10 @@ Hal.klaim = {
    ========================================================================== */
 function HalRekap(el, ctx, q) {
   const ing = App.ingat('rekap') || {}, mxIng = (App.ingat('dasbor') || {}).mx || {};
-  const f = { prodi: q.prodi || ing.prodi || mxIng.prodi || (App.prodi()[0] || {}).kode, angk: q.angkatan || ing.angk || mxIng.angk || App.angkatanList()[0], saring: ing.saring || 'semua', q: '' };
+  const f = { prodi: q.prodi || ing.prodi || mxIng.prodi || (App.prodi()[0] || {}).kode, angk: q.angkatan || ing.angk || mxIng.angk || App.angkatanList()[0], saring: q.saring || ing.saring || 'semua', q: '' };
   const pilih = new Set();
   el.innerHTML = '<div class="page-head"><div style="flex:1;min-width:260px"><h2>Rekap nilai per angkatan</h2><div class="desc">MK kurikulum PDDIKTI yang sudah & belum bernilai di satu angkatan, beserta kelas pengisinya di semua periode.</div></div>' +
-    '<button class="btn" id="rk-kembali">' + ic('back') + 'Kelas kuliah</button><button class="btn" id="rk-riw">' + ic('history') + 'Riwayat kelas PDDIKTI</button><button class="btn" id="rk-xls">' + ic('download') + 'Unduh Excel</button></div>' +
+    '<button class="btn" id="rk-kembali">' + ic('back') + 'Kelas kuliah</button><button class="btn" id="rk-riw">' + ic('history') + 'Riwayat kelas PDDIKTI</button><button class="btn" id="rk-unggah" title="Unggah file nilai per mahasiswa (transkrip/KHS)">' + ic('upload') + 'Unggah nilai</button><button class="btn" id="rk-xls">' + ic('download') + 'Unduh Excel</button></div>' +
     '<div id="rk-kpi">' + skelKpi(4) + '</div>' +
     '<div class="card mt-16"><div class="toolbar"><select class="input" id="rk-prodi" title="Prodi">' + opsi(App.prodi().map((x) => ({ v: x.kode, t: x.kode })), f.prodi) + '</select><select class="input" id="rk-angk">' + opsi(App.angkatanList(), f.angk, (a) => 'Angkatan ' + a) + '</select>' +
     '<div class="seg" id="rk-seg">' + [['semua', 'Semua'], ['lengkap', 'Sudah lengkap'], ['sebagian', 'Sebagian'], ['belum', 'Belum ada nilai']].map((x) => '<button data-v="' + x[0] + '"' + (f.saring === x[0] ? ' class="on"' : '') + '>' + x[1] + '</button>').join('') + '</div>' +
@@ -612,6 +616,7 @@ function HalRekap(el, ctx, q) {
   $('#rk-kembali', el).onclick = () => App.pergi('/perkuliahan');
   $('#rk-xls', el).onclick = (e) => tombolProses(e.currentTarget, unduh);
   $('#rk-riw', el).onclick = () => modalRiwayatBatch('Riwayat kelas PDDIKTI', /^PDK-/, 'Kelas PDDIKTI bisa dibatalkan selama belum ada nilai yang diisi.', muat);
+  $('#rk-unggah', el).onclick = () => unggahNilaiMhs({ angk: f.angk, prodi: f.prodi, setelah: () => { Store.basi(); muat(); } });   // v1.3
   $('#rk-buat', el).onclick = () => kelasPddikti({ prodi: f.prodi, angk: f.angk, mkIds: Array.from(pilih), setelah: muat });
   $('#rk-isi', el).addEventListener('click', (e) => {
     const c = e.target.closest('[data-pil]');
@@ -702,4 +707,281 @@ function kelasPddikti(o) {
   $('#kp-sembunyi', el).onchange = gambar;
   $('#kp-lihat', el).onclick = (e) => tombolProses(e.currentTarget, muat);
   muat();
+}
+
+/* ==========================================================================
+   v1.3 — UNGGAH NILAI PER MAHASISWA
+   File transkrip/KHS (mis. salinan halaman nilai Neo Feeder): satu sheet = satu mahasiswa,
+   identitas NIM & Nama di atas, tabel Kode MK · Nama MK · Periode · Nilai di bawahnya.
+   Juga membaca format daftar (satu baris = satu nilai, kolom NIM) seperti format impor Neo Feeder.
+   ========================================================================== */
+const UNM_LABEL = { nim: /^(nim|npm|no induk|nomor induk|nomor induk mahasiswa)$/, nama: /^(nama|nama mahasiswa|nama lengkap)$/, prodi: /^(program studi|prodi|jurusan)$/ };
+const UNM_LABEL_LAIN = /^(status|status keluar|angkatan|semester|ipk|ips|sks|tahun masuk|kelas|jenjang|tempat tanggal lahir|ttl)$/;
+const unmSel = (v) => (v === null || v === undefined || v instanceof Date) ? '' : String(v).trim();
+const unmAngka = (v) => { const n = parseAngka(v); return n === null || isNaN(n) ? null : n; };
+/** "2019/2020 Ganjil" → 20191 · "Genap 2020/2021" → 20202 · "20191" → 20191 · angka 1–16 → semester ke-n. */
+function unmPeriode(v) {
+  const s = unmSel(v); if (!s) return { p: '' };
+  if (/^\d{4}[12]$/.test(s)) return { p: s };
+  if (/^\d{4}3$/.test(s)) return { p: s.slice(0, 4) + '2', pendek: true };
+  if (/^\d{1,2}$/.test(s) && Number(s) >= 1 && Number(s) <= 16) return { p: '', smt: Number(s) };
+  const t = normNama(s), th = s.match(/(\d{4})\s*[/\-–]\s*\d{2,4}/) || s.match(/(\d{4})/);
+  if (!th) return { p: '' };
+  if (/ganjil|gasal/.test(t)) return { p: th[1] + '1' };
+  if (/genap/.test(t)) return { p: th[1] + '2' };
+  if (/pendek|antara/.test(t)) return { p: th[1] + '2', pendek: true };
+  return { p: '' };
+}
+/** Identitas di atas tabel: label "NIM", lalu ":" dan nilainya di kanan ATAU di bawah (bentuk bertumpuk seperti salinan halaman web). */
+function unmIdentitas(a) {
+  const out = {}, labelDari = (s) => { for (const f in UNM_LABEL) if (UNM_LABEL[f].test(s)) return f; return UNM_LABEL_LAIN.test(s) ? '_' : ''; };
+  for (let i = 0; i < Math.min(a.length, 40); i++) {
+    const row = a[i] || [];
+    for (let c = 0; c < Math.min(row.length, 15); c++) {
+      const raw = unmSel(row[c]); if (!raw || raw.length > 60) continue;
+      const m1 = raw.match(/^([^:]{2,30}?)\s*:\s*(.*)$/), f = labelDari(normNama(m1 ? m1[1] : raw));
+      if (!f || f === '_' || out[f]) continue;
+      let v = m1 ? m1[2].trim() : '';
+      if (!v) for (let j = c + 1; j < Math.min(row.length, c + 6); j++) { const t = unmSel(row[j]); if (!t || t === ':') continue; if (labelDari(normNama(t))) break; v = t.replace(/^:\s*/, ''); break; }
+      if (!v) for (let j = i + 1; j < Math.min(a.length, i + 4); j++) { const t = unmSel((a[j] || [])[c]); if (!t || t === ':') continue; if (labelDari(normNama(t))) break; v = t.replace(/^:\s*/, ''); break; }
+      if (v && v !== '-') out[f] = v;
+    }
+  }
+  return out;
+}
+/** Tabel nilai: baris judul berisi "Kode MK" & "Nama MK" (judul dua baris seperti "Nilai / Angka" ikut digabung). */
+function unmTabel(a) {
+  let hi = -1;
+  for (let i = 0; i < Math.min(a.length, 80); i++) { const r = (a[i] || []).map((x) => normNama(unmSel(x))); if (r.some((x) => /^kode( mk| mata kuliah| matakuliah)?$/.test(x)) && r.some((x) => /^nama( mk| mata kuliah| matakuliah)$|^mata kuliah$/.test(x))) { hi = i; break; } }
+  if (hi < 0) return null;
+  const h0 = a[hi] || [], h1 = a[hi + 1] || [];
+  const sub = h1.some((x) => /^(angka|huruf|indeks|sks|bobot|nilai)$/.test(normNama(unmSel(x)))) && !h1.some((x) => /\d/.test(unmSel(x)) && /[a-z]/i.test(unmSel(x)));
+  const H = []; for (let c = 0; c < Math.max(h0.length, sub ? h1.length : 0); c++) H.push(normNama(unmSel(h0[c]) + ' ' + (sub ? unmSel(h1[c]) : '')));
+  const col = (...res) => { for (const re of res) { const i = H.findIndex((x) => re.test(x)); if (i > -1) return i; } return -1; };
+  const C = { nim: col(/^nim$|^npm$/), namaMhs: col(/^nama mahasiswa$|^nama lengkap$/), kode: col(/^kode( mk| mata kuliah| matakuliah)$/, /^kode$/), nama: col(/^nama( mk| mata kuliah| matakuliah)$/, /^mata kuliah$/),
+    periode: col(/^periode/, /^tahun akademik/, /^semester$/), smt: col(/^semester ke/, /^smt/), sks: col(/^bobot/, /^sks( mk)?$/),
+    angka: col(/nilai angka/, /^angka$/, /^nilai$/), huruf: col(/huruf/), indeks: H.findIndex((x) => /indeks/.test(x) && !/sks/.test(x)) };
+  const sel = (r, c) => c > -1 ? r[c] : '';
+  const rows = [];
+  for (let i = hi + (sub ? 2 : 1); i < a.length; i++) {
+    const r = a[i] || [], kode = unmSel(sel(r, C.kode));
+    if (!/\d/.test(kode) || !/[a-z]/i.test(kode)) continue;              // lompati judul bagian ("Nilai Kelas Perkuliahan"), total, baris kosong
+    const pr = unmPeriode(sel(r, C.periode)), sk = unmSel(sel(r, C.smt));
+    rows.push({ baris: i + 1, kode: kode, nama: unmSel(sel(r, C.nama)), periode: pr.p, periodeTeks: unmSel(sel(r, C.periode)), pendek: !!pr.pendek, smt: /^\d{1,2}$/.test(sk) ? Number(sk) : (pr.smt || ''),
+      sks: unmAngka(sel(r, C.sks)), angka: unmAngka(sel(r, C.angka)), huruf: unmSel(sel(r, C.huruf)), indeks: unmAngka(sel(r, C.indeks)), nim: unmSel(sel(r, C.nim)), namaMhs: unmSel(sel(r, C.namaMhs)) });
+  }
+  return { C: C, rows: rows };
+}
+async function unmBacaFile(file) {
+  const wb = await Excel.baca(file), siswa = [], lewat = [];
+  const bersih = (x) => ({ baris: x.baris, kode: x.kode, nama: x.nama, periode: x.periode, periodeTeks: x.periodeTeks, pendek: x.pendek, smt: x.smt, sks: x.sks, angka: x.angka, huruf: x.huruf, indeks: x.indeks });
+  for (const nm of wb.SheetNames) {
+    const a = await Excel.baris(wb, nm), t = unmTabel(a);
+    if (!t || !t.rows.length) { lewat.push({ file: file.name, sheet: nm, alasan: t ? 'tabel nilai kosong' : 'tidak ada tabel berjudul Kode MK & Nama MK' }); continue; }
+    if (t.C.nim > -1) {                                                  // format daftar → kelompokkan per NIM
+      const g = {};
+      t.rows.forEach((x) => { if ((!x.nim && !x.namaMhs) || /^0+$/.test(x.nim)) return; const k = x.nim || '?' + x.namaMhs; (g[k] = g[k] || { file: file.name, sheet: nm, nim: x.nim, nama: x.namaMhs, prodi: '', rows: [] }).rows.push(bersih(x)); });
+      Object.keys(g).forEach((k) => siswa.push(g[k]));
+      continue;
+    }
+    const id = unmIdentitas(a);
+    if (!id.nim && !id.nama) { lewat.push({ file: file.name, sheet: nm, alasan: 'identitas NIM / Nama tidak ditemukan di atas tabel' }); continue; }
+    siswa.push({ file: file.name, sheet: nm, nim: id.nim || '', nama: id.nama || '', prodi: id.prodi || '', rows: t.rows.map(bersih) });
+  }
+  return { siswa: siswa, lewat: lewat };
+}
+const UNM_ST = {
+  simpan: ['s-SL', 'disimpan'], timpa: ['s-SX', 'diganti'], tandai: ['s-SD', 'ditandai dilapor'], ada: ['info', 'peta dilengkapi'], sama: ['no-dot', 'sudah ada'], kunci: ['s-SD', 'terkunci'],
+  beda: ['warn', 'berbeda'], mk: ['danger', 'MK tidak cocok'], nilai: ['danger', 'nilai kosong'], periode: ['danger', 'periode?'], ganda: ['no-dot', 'ganda'], tb: ['no-dot', 'tidak berlaku']
+};
+/** Modal unggah nilai per mahasiswa. o = { angk, prodi, setelah } */
+function unggahNilaiMhs(o) {
+  o = o || {};
+  const st = { siswa: [], lewat: [], files: [], hasil: null, opsi: { timpa: false, lapor: false }, perlu: false, buka: new Set(), mhs: null, nomor: 0 };
+  const kur = {}; (App.M.kurikulum || []).forEach((k) => { kur[k.id] = k; });
+  const md = modal({
+    judul: 'Unggah nilai per mahasiswa' + (o.angk ? ' · angkatan ' + o.angk : ''), lebar: 'sangat-lebar', tanpaFokus: true,
+    desc: 'Untuk file transkrip/KHS: <b>satu sheet = satu mahasiswa</b> (NIM &amp; Nama di atas, tabel Kode MK, Nama MK, Periode, dan Nilai di bawahnya). Nilai otomatis masuk ke mata kuliah yang sesuai, sesuai NIM mahasiswanya.',
+    isi: '<div id="un-isi"></div>',
+    tombol: [
+      { teks: 'Riwayat unggahan', ikon: 'history', kiri: true, aksi: () => { modalRiwayatBatch('Riwayat unggah nilai per mahasiswa', /^UNM-/, 'Unggahan bisa dibatalkan selama nilainya belum dilapor lewat halaman Lapor PDDIKTI. Nilai yang ditandai "sudah dilapor" saat unggah ikut dicabut.', () => { if (o.setelah) o.setelah(); }); return false; } },
+      { teks: 'Batal', aksi: () => true },
+      { teks: 'Simpan nilai', kelas: 'btn-primary', ikon: 'save', aksi: (close) => simpan(close) }]
+  });
+  const el = md.el, box = $('#un-isi', el), btnSimpan = $$('.modal-f .btn', el).slice(-1)[0];
+  const aturTombol = () => {
+    const R = st.hasil && st.hasil.ringkas, n = R ? R.ditulis : 0;
+    btnSimpan.disabled = !n; btnSimpan.innerHTML = ic('save') + (n ? 'Simpan ' + fmtInt(n) + ' nilai' : 'Simpan nilai');
+  };
+  aturTombol();
+  const tahap1 = () => {
+    st.hasil = null; aturTombol();
+    box.innerHTML = '<div class="drop" id="un-drop">' + ic('upload') + '<div><b>Pilih atau seret file Excel nilai mahasiswa ke sini</b></div><div class="mt-4">Boleh beberapa file sekaligus (.xlsx / .xls / .csv) · satu file boleh berisi banyak sheet</div><input type="file" id="un-file" multiple accept=".xlsx,.xls,.csv" hidden></div>' +
+      '<div class="un-contoh mt-16"><div class="lbl mb-4">Bentuk file yang dibaca (contoh satu sheet)</div><div class="un-lembar"><div class="un-id"><span>NIM</span><b class="mono">19.20.1.01</b><span>Nama</span><b>Nama Mahasiswa</b><span>Program Studi</span><b>S1 Ekonomi Syariah</b></div>' +
+      '<table class="tbl tbl-compact"><thead><tr><th>No</th><th>Kode MK</th><th>Nama MK</th><th>Periode</th><th class="num">SKS</th><th class="num">Nilai Angka</th><th>Huruf</th><th class="num">Indeks</th></tr></thead><tbody><tr><td>1</td><td class="mono">ESY1418</td><td>Pengantar Akuntansi</td><td>2019/2020 Ganjil</td><td class="num">4</td><td class="num">98</td><td>A</td><td class="num">4</td></tr><tr><td>2</td><td class="mono">WAF1408ESY</td><td>Bahasa Arab I</td><td>2019/2020 Ganjil</td><td class="num">4</td><td class="num">86</td><td>B+</td><td class="num">3,66</td></tr></tbody></table></div>' +
+      '<div class="hint mt-8">Mahasiswa dicocokkan lewat <b>NIM</b> (cadangan: nama). Mata kuliah dicocokkan ke kurikulum angkatannya lewat <b>Kode MK</b> (spasi diabaikan; cadangan: nama MK). Nilai yang sudah dilapor tidak pernah diubah. Format daftar impor Neo Feeder (kolom NIM, Kode Mata Kuliah, Semester, Nilai Angka) juga bisa dibaca.</div></div>';
+    const drop = $('#un-drop', box), inp = $('#un-file', box);
+    drop.onclick = () => inp.click();
+    inp.onchange = () => { const f = Array.from(inp.files || []); inp.value = ''; if (f.length) baca(f); };
+    drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); const f = Array.from(e.dataTransfer.files || []).filter((x) => /\.(xlsx|xls|csv)$/i.test(x.name)); if (f.length) baca(f); else toast('Pilih file Excel (.xlsx/.xls/.csv).', 'warn'); });
+  };
+  async function baca(files) {
+    box.innerHTML = '<div class="un-muat">' + ic('sheet') + '<b>Membaca ' + files.length + ' file…</b></div>';
+    st.siswa = []; st.lewat = []; st.files = files.map((f) => f.name); st.buka.clear();
+    try {
+      for (const f of files) { const h = await unmBacaFile(f); st.siswa.push(...h.siswa); st.lewat.push(...h.lewat); }
+    } catch (e) { toast('File tidak bisa dibaca: ' + e.message, 'err', 7000); tahap1(); return; }
+    if (!st.siswa.length) {
+      tahap1();
+      box.insertAdjacentHTML('afterbegin', '<div class="alert danger mb-12">' + ic('xc') + '<div><b>Tidak ada data nilai mahasiswa yang terbaca.</b> ' + esc(st.lewat.slice(0, 4).map((x) => x.sheet + ': ' + x.alasan).join(' · ')) + '</div></div>');
+      return;
+    }
+    await cek();
+  }
+  const muatan = () => ({ angkatan: o.angk || '', opsi: st.opsi, siswa: st.siswa.map((s) => ({ file: s.file, sheet: s.sheet, nim: s.nim, nama: s.nama, prodi: s.prodi, pilih: s.pilih || '', rows: s.rows })) });
+  async function cek() {
+    const no = ++st.nomor;
+    if (!st.hasil) box.innerHTML = '<div class="un-muat">' + ic('sheet') + '<b>Mencocokkan ' + fmtInt(st.siswa.length) + ' mahasiswa dengan data &amp; kurikulum…</b></div>';
+    else box.classList.add('memuat');
+    const r = await api('unggahNilai.cek', muatan());
+    box.classList.remove('memuat');
+    if (no !== st.nomor) return;                                             // ada cek yang lebih baru
+    if (!r.success) { box.innerHTML = '<div class="alert danger">' + ic('xc') + '<div>' + esc(r.message) + '</div></div>'; st.hasil = null; aturTombol(); return; }
+    st.hasil = r.data; aturTombol(); tahap2();
+  }
+  const kotak = (n, t, cls) => '<div' + (cls ? ' class="' + cls + '"' : '') + '><b>' + fmtInt(n) + '</b><span>' + esc(t) + '</span></div>';
+  const pill = (s) => { const x = UNM_ST[s] || ['no-dot', s]; return '<span class="pill ' + x[0] + '">' + esc(x[1]) + '</span>'; };
+  const ketBaris = (x) => x.j === 'isi' ? 'Diisi ke peserta kelas ' + x.kl : x.j === 'tambah' ? 'Ditambahkan ke kelas ' + x.kl : x.j === 'baru' ? 'Kelas baru: ' + x.kl : x.j === 'tandai' ? 'Nilai sama sudah ada → ditandai sudah dilapor' : (x.k || '');
+  const perluCek = (h) => !h.cocok || h.peringatan.length || h.rows.some((x) => ['beda', 'mk', 'nilai', 'periode'].includes(x.s));
+  function tahap2() {
+    const H = st.hasil, R = H.ringkas, lewatBaris = R.sama + R.beda + R.kunci + R.mk + R.nilai + R.periode + R.ganda + R.tb;
+    const daftar = H.siswa.filter((h) => !st.perlu || perluCek(h));
+    const alerts = [];
+    if (R.mhsTidak) alerts.push(['warn', 'warn', '<b>' + R.mhsTidak + ' sheet belum cocok dengan mahasiswa mana pun.</b> Pilih mahasiswanya di kolom "Mahasiswa di sistem", atau biarkan (sheet itu dilewati).']);
+    if (R.beda) alerts.push(['warn', 'warn', '<b>' + R.beda + ' nilai berbeda</b> dengan nilai yang sudah ada (belum dilapor). Centang <b>Timpa nilai yang berbeda</b> bila nilai di file yang benar.']);
+    if (R.mk) alerts.push(['info', 'info', '<b>' + R.mk + ' baris</b> kode MK-nya tidak ada di kurikulum angkatan tersebut — dilewati. Periksa kode di file atau kurikulum (menu Kurikulum).']);
+    if (R.kunci) alerts.push(['info', 'lock', R.kunci + ' nilai sudah dilapor (terkunci) — tidak diubah.']);
+    if (st.lewat.length) alerts.push(['info', 'info', st.lewat.length + ' sheet dilewati: ' + esc(st.lewat.slice(0, 5).map((x) => x.sheet + ' (' + x.alasan + ')').join(', ')) + (st.lewat.length > 5 ? ', …' : '')]);
+    box.innerHTML = '<div class="row-wrap mb-12" style="gap:6px">' + st.files.slice(0, 6).map((f) => '<span class="pill no-dot">' + ic('sheet', 'ic-sm') + ' ' + esc(f) + '</span>').join('') + (st.files.length > 6 ? '<span class="pill no-dot">+' + (st.files.length - 6) + ' file</span>' : '') +
+      '<span class="muted" style="font-size:12.5px">' + fmtInt(H.siswa.length) + ' sheet mahasiswa terbaca</span><span class="spacer"></span><button class="btn btn-sm btn-ghost" id="un-ganti">' + ic('upload', 'ic-sm') + 'Ganti file</button></div>' +
+      '<div class="ringkas-batal">' + kotak(R.ditulis, 'nilai akan disimpan', 'un-utama') + kotak(R.mhsCocok, 'dari ' + R.mhs + ' mahasiswa cocok') + kotak(R.kelasBaru, 'kelas PDDIKTI baru') + kotak(R.kelasLama, 'kelas lama diisi') + kotak(lewatBaris, 'baris dilewati') + '</div>' +
+      '<div class="un-opsi mt-12"><label class="check"><input type="checkbox" id="un-timpa"' + (st.opsi.timpa ? ' checked' : '') + '>Timpa nilai yang berbeda <span class="muted">(hanya yang belum dilapor)</span></label>' +
+      '<label class="check"><input type="checkbox" id="un-lapor"' + (st.opsi.lapor ? ' checked' : '') + '>Nilai ini sudah ada di PDDIKTI (Neo Feeder) → tandai <b>SUDAH DILAPOR</b> <span class="muted">(huruf &amp; indeks dari file, langsung terkunci)</span></label></div>' +
+      alerts.map((a) => '<div class="alert ' + a[0] + ' mt-8">' + ic(a[1]) + '<div>' + a[2] + '</div></div>').join('') +
+      '<div class="row mt-12 mb-8"><b>Per mahasiswa</b><span class="muted" style="font-size:12.5px">klik baris untuk melihat tiap mata kuliah</span><span class="spacer"></span><label class="check"><input type="checkbox" id="un-perlu"' + (st.perlu ? ' checked' : '') + '>Hanya yang perlu dicek</label></div>' +
+      '<div class="tbl-wrap" style="max-height:46vh"><table class="tbl tbl-compact" id="un-tbl"><thead><tr><th style="width:28px"></th><th>Di file (sheet)</th><th>Mahasiswa di sistem</th><th class="num">Disimpan</th><th class="num">Dilewati</th><th>Catatan</th></tr></thead><tbody>' +
+      (daftar.length ? daftar.map(barisMhs).join('') : '<tr><td colspan="6">' + kosong('Semua beres', 'Tidak ada yang perlu dicek.', 'checkc') + '</td></tr>') + '</tbody></table></div>';
+    $('#un-ganti', box).onclick = tahap1;
+    $('#un-timpa', box).onchange = (e) => { st.opsi.timpa = e.target.checked; cek(); };
+    $('#un-lapor', box).onchange = (e) => { st.opsi.lapor = e.target.checked; cek(); };
+    $('#un-perlu', box).onchange = (e) => { st.perlu = e.target.checked; tahap2(); };
+    const tb = $('#un-tbl', box);
+    tb.addEventListener('click', (e) => {
+      if (e.target.closest('select')) return;
+      const tr = e.target.closest('tr[data-i]'); if (!tr) return;
+      const i = Number(tr.dataset.i), d = tr.nextElementSibling;
+      if (st.buka.has(i)) { st.buka.delete(i); d.hidden = true; tr.classList.remove('buka'); }
+      else { st.buka.add(i); if (!d.dataset.isi) { d.firstChild.innerHTML = detailMhs(H.siswa.find((h) => h.i === i)); d.dataset.isi = 1; } d.hidden = false; tr.classList.add('buka'); }
+    });
+    tb.addEventListener('change', (e) => { const s = e.target.closest('select[data-pilih]'); if (!s) return; st.siswa[Number(s.dataset.pilih)].pilih = s.value; cek(); });
+    if (st.mhs === null && H.siswa.some((h) => !h.cocok)) { st.mhs = []; Store.ambil('mhs.list', {}).then((r) => { if (r.success) { st.mhs = r.data; $$('select[data-pilih]', box).forEach((s) => { s.innerHTML = opsiMhs(Number(s.dataset.pilih)); }); } }); }
+  }
+  const opsiMhs = (i) => {
+    const h = st.hasil.siswa.find((x) => x.i === i) || { kand: [] }, pil = st.siswa[i].pilih || '';
+    const kand = (h.kand || []).map((m) => m.nim), daftar = (st.mhs || []).filter((m) => !o.angk || String(m.ikut_angkatan) === String(o.angk) || kand.includes(m.nim)).sort((a, b) => (kand.includes(b.nim) - kand.includes(a.nim)) || String(a.nama).localeCompare(String(b.nama)));
+    return '<option value="">— lewati sheet ini —</option>' + daftar.map((m) => '<option value="' + esc(m.nim) + '"' + (pil === m.nim ? ' selected' : '') + '>' + esc(m.nim + ' · ' + m.nama + ' (' + m.prodi + ' ' + m.ikut_angkatan + ')') + '</option>').join('');
+  };
+  function barisMhs(h) {
+    const s = st.siswa[h.i], m = h.cocok;
+    const cara = { nim: '', nama: '<span class="pill info" title="Dicocokkan lewat nama">via nama</span>', manual: '<span class="pill brand no-dot">dipilih</span>' }[h.cara] || '';
+    const kolomMhs = m ? '<b style="font-weight:600">' + esc(m.nama) + '</b> ' + cara + '<div class="sub"><span class="mono">' + esc(m.nim) + '</span> · ' + esc(m.prodi) + ' ' + esc(m.angkatan) + ' · ' + esc(m.status) + '</div>' +
+      (h.cara === 'manual' ? '<select class="input input-sm mt-4" data-pilih="' + h.i + '">' + opsiMhs(h.i) + '</select>' : '')
+      : '<div class="row gap-4"><span class="pill warn">' + (h.cara === 'ganda' ? 'nama ganda' : 'tidak ditemukan') + '</span></div><select class="input input-sm mt-4" data-pilih="' + h.i + '" style="max-width:320px">' + opsiMhs(h.i) + '</select>';
+    const cat = h.peringatan.map((p) => '<div class="sub" style="color:var(--warn)">' + ic('warn', 'ic-sm') + ' ' + esc(p) + '</div>').join('');
+    return '<tr data-i="' + h.i + '" class="un-mhs' + (st.buka.has(h.i) ? ' buka' : '') + (m ? '' : ' r-ragu') + '"><td class="center muted">' + ic('next', 'ic-sm un-panah') + '</td><td><div class="mono">' + esc(s.nim || '–') + '</div><div class="sub">' + esc(s.nama || '–') + ' · <span title="' + esc(s.file) + '">' + esc(s.sheet) + '</span></div></td><td>' + kolomMhs + '</td>' +
+      '<td class="num"><b>' + fmtInt(h.n.simpan) + '</b></td><td class="num">' + fmtInt(h.n.lewat) + '</td><td>' + (cat || '<span class="soft">–</span>') + '</td></tr>' +
+      '<tr class="un-det"' + (st.buka.has(h.i) ? ' data-isi="1"' : ' hidden') + '><td colspan="6">' + (st.buka.has(h.i) ? detailMhs(h) : '') + '</td></tr>';
+  }
+  function detailMhs(h) {
+    const s = st.siswa[h.i];
+    if (!h.cocok) return '<div class="muted" style="padding:6px 4px">' + fmtInt(s.rows.length) + ' baris nilai — pilih mahasiswanya dulu untuk melihat pencocokan MK.</div>';
+    return '<table class="tbl tbl-compact un-dalam"><thead><tr><th>Kode di file</th><th>Mata kuliah di file</th><th>Periode</th><th class="num">Nilai</th><th>MK kurikulum</th><th>Hasil</th></tr></thead><tbody>' +
+      h.rows.map((x, j) => {
+        const f = s.rows[j] || {}, k = kur[x.mk];
+        return '<tr class="' + (UNM_SIMPAN_FE[x.s] ? '' : 'r-off') + '"><td class="mono nowrap">' + esc(f.kode) + '</td><td>' + esc(f.nama) + '</td><td class="nowrap">' + esc(x.p ? labelPeriode(x.p) : (f.periodeTeks || '–')) + (f.pendek ? ' <span class="pill no-dot" title="Semester pendek dicatat ke periode genap">pendek</span>' : '') + '</td>' +
+          '<td class="num nowrap">' + esc(f.angka === null || f.angka === undefined ? '–' : String(f.angka).replace('.', ',')) + (f.huruf ? ' <span class="sub">' + esc(f.huruf) + '</span>' : '') + (x.a !== undefined && x.a !== null ? '<div class="sub" style="display:block">sudah ada: ' + esc(String(x.a).replace('.', ',')) + '</div>' : '') + '</td>' +
+          '<td>' + (k ? '<span class="mono">' + esc(k.kode_mk) + '</span> ' + esc(k.nama_mk) + (x.c === 'nama' ? ' <span class="pill info" title="Cocok lewat nama MK">nama</span>' : '') : '<span class="soft">–</span>') + '</td>' +
+          '<td>' + pill(x.s) + ' <span class="sub">' + esc(ketBaris(x)) + '</span></td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  async function simpan(close) {
+    const R = st.hasil && st.hasil.ringkas;
+    if (!R || !R.ditulis) { toast('Belum ada nilai yang bisa disimpan.', 'warn'); return false; }
+    const ket = fmtInt(R.ditulis) + ' nilai untuk ' + fmtInt(st.hasil.siswa.filter((h) => h.cocok && h.n.simpan).length) + ' mahasiswa' + (R.kelasBaru ? ', ' + R.kelasBaru + ' kelas PDDIKTI baru dibuat' : '');
+    const ok = st.opsi.lapor
+      ? await konfirmasiKetik({ judul: 'Simpan & tandai SUDAH DILAPOR', kata: 'LAPOR', tombolTeks: 'Simpan & tandai', pesan: 'Simpan <b>' + ket + '</b> dan tandai semuanya <b>SUDAH DILAPOR</b> (terkunci)? Pilih ini hanya bila nilai di file memang sudah ada di Neo Feeder/PDDIKTI. Bisa dibatalkan dari Riwayat unggahan.' })
+      : await konfirmasi('Simpan nilai', 'Simpan <b>' + ket + '</b>? Unggahan bisa dibatalkan dari <b>Riwayat unggahan</b> selama nilainya belum dilapor.', 'Simpan');
+    if (!ok) return false;
+    const r = await api('unggahNilai.simpan', muatan());
+    if (!r.success) { toast(r.message, 'err', 7000); return false; }
+    close();
+    if (r.data.cermin) await App.segarkanMaster();
+    hasilUnggah(r);
+    if (o.setelah) o.setelah();
+    return false;
+  }
+  function hasilUnggah(r) {
+    const d = r.data, ko = d.kohort[0] || {};
+    modal({ judul: 'Nilai tersimpan', desc: '<span class="mono">' + esc(d.batch) + '</span>',
+      isi: '<div class="alert ok mb-12">' + ic('checkc') + '<div>' + esc(r.message) + '</div></div><div class="ringkas-batal">' + kotak(d.nilai, 'nilai baru') + kotak(d.timpa, 'nilai diganti') + kotak(d.mhs, 'mahasiswa') + kotak(d.kelasBaru, 'kelas PDDIKTI baru') + kotak(d.kelasLama, 'kelas lama diisi') + '</div>' +
+        '<div class="hint mt-12">Kelas mengikuti periode di file (' + esc(d.periode.map(labelPeriode).join(', ')) + '). Semua kelas &amp; nilainya bisa dilihat sekaligus di <b>Rekap nilai angkatan</b>.' + (d.lapor ? ' Nilai sudah ditandai SUDAH DILAPOR.' : ' Status nilai: <b>Siap lapor</b>.') + '</div>',
+      tombol: [{ teks: 'Tutup', aksi: () => true }].concat(ko.prodi ? [{ teks: 'Buka rekap ' + ko.prodi + ' ' + ko.angkatan, kelas: 'btn-primary', ikon: 'layers', aksi: () => { App.pergi('/perkuliahan/rekap?prodi=' + encodeURIComponent(ko.prodi) + '&angkatan=' + encodeURIComponent(ko.angkatan) + '&saring=semua'); return true; } }] : []) });
+  }
+  tahap1();
+  return md;
+}
+const UNM_SIMPAN_FE = { simpan: 1, timpa: 1, tandai: 1, ada: 1 };
+
+/* ==========================================================================
+   v1.3 — "UNDUH DAFTAR" FORMAT IMPOR NILAI NEO FEEDER
+   Kolom: NIM · Nama Mahasiswa · Kode Mata Kuliah · Nama Mata Kuliah · Semester · Nama Kelas ·
+   Nilai Huruf · Nilai Indeks · Nilai Angka · Kode Prodi · Nama Prodi (judul merah/kuning/hijau).
+   Kode & nama MK PDDIKTI (lewat Peta Klaim), semester, nama kelas, kode & nama prodi dipetakan di
+   server saat diunduh — nama MK riil & kelas di sistem tidak diubah.
+   ========================================================================== */
+async function unduhDaftarFeeder(k, kelasId) {
+  const [r, ExcelJS] = await Promise.all([api('nilai.feeder', { kelas_id: kelasId }), muat('exceljs')]);
+  if (!r.success) { toast(r.message, 'err'); return; }
+  const d = r.data;
+  if (!d.rows.length) { toast('Kelas ini belum punya peserta.', 'warn'); return; }
+  const MERAH = 'FFFF0000', KUNING = 'FFFFFF00', HIJAU = 'FF00FF00', tipis = { style: 'thin', color: { argb: 'FFBFBFBF' } }, garis = { top: tipis, left: tipis, bottom: tipis, right: tipis };
+  const kol = [['NIM', MERAH, 13, 'NIM mahasiswa'], ['Nama Mahasiswa', KUNING, 32, 'Nama lengkap mahasiswa'], ['Kode Mata Kuliah', MERAH, 20, 'Kode mata kuliah sesuai kurikulum di PDDIKTI'],
+    ['Nama Mata Kuliah', KUNING, 34, 'Nama mata kuliah sesuai kurikulum di PDDIKTI'], ['Semester', MERAH, 13, 'Kode semester: tahun + 1 (ganjil) / 2 (genap), mis. 20252 = Genap 2025/2026'],
+    ['Nama Kelas', MERAH, 13, 'Nama kelas kuliah di PDDIKTI'], ['Nilai Huruf', HIJAU, 12, 'Nilai huruf (A, B+, B, …)'], ['Nilai Indeks', HIJAU, 13, 'Nilai indeks / bobot (0–4)'],
+    ['Nilai Angka', HIJAU, 13, 'Nilai angka (0–100)'], ['Kode Prodi', MERAH, 12, 'Kode program studi di PDDIKTI'], ['Nama Prodi', KUNING, 28, 'Nama program studi']];
+  const wb = new ExcelJS.Workbook(); wb.creator = 'NILAI – AL WAFA';
+  const ws = wb.addWorksheet('Sheet1', { views: [{ state: 'frozen', ySplit: 1 }], pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
+  ws.columns = kol.map((c) => ({ width: c[2] }));
+  const hr = ws.getRow(1); hr.values = kol.map((c) => c[0]); hr.height = 18;
+  kol.forEach((c, i) => {
+    const cell = hr.getCell(i + 1);
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: c[1] } };
+    cell.font = { bold: true, color: { argb: c[1] === KUNING ? 'FF000000' : 'FFFFFFFF' } };
+    cell.alignment = { horizontal: 'center', vertical: 'middle' }; cell.border = garis; cell.note = c[3];
+  });
+  d.rows.forEach((x, i) => {
+    const row = ws.getRow(i + 2), nimAngka = /^[1-9]\d{0,14}$/.test(x.nim);
+    row.values = [nimAngka ? Number(x.nim) : x.nim, x.nama, x.kode, x.mk, x.semester, x.nama_kelas, x.huruf || '', x.indeks === '' || x.indeks === null ? null : Number(x.indeks),
+      x.angka === '' || x.angka === null ? null : Number(x.angka), d.kode_prodi, d.nama_prodi];
+    [3, 5, 6, 10].forEach((c) => { row.getCell(c).numFmt = '@'; });
+    if (!nimAngka) row.getCell(1).numFmt = '@';
+  });
+  const buf = await wb.xlsx.writeBuffer(), c0 = d.klaim[0];
+  const nama = namaFile('Daftar_Nilai_' + (c0 ? c0.kode + '_' + (d.rows[0].nama_kelas || '') + '_' + d.rows[0].semester : (d.mk_riil || k.mk) + '_' + k.ikut_angkatan));
+  unduhBlob(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), nama + '.xlsx');
+  const info = d.peringatan.slice();
+  if (d.klaim.length > 1) info.push('MK ini diklaim untuk ' + d.klaim.length + ' MK PDDIKTI (' + d.klaim.map((c) => c.kode).join(', ') + ') — tiap mahasiswa muncul ' + d.klaim.length + ' baris.');
+  toast(info.length ? 'Daftar diunduh. ' + info.join(' ') : 'Daftar nilai (format impor Neo Feeder) diunduh.', info.length ? 'warn' : 'ok', info.length ? 9000 : 3200);
 }
