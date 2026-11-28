@@ -4,7 +4,7 @@
    UI kit: toast, modal, konfirmasi ketik, tabel, skeleton, cetak A4, lazy-lib
    ========================================================================== */
 'use strict';
-const APP_VER = '1.4.0';
+const APP_VER = '1.4.1';
 const $ = (s, el) => (el || document).querySelector(s);
 const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
 const esc = (v) => String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));

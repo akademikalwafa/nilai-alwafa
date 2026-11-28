@@ -768,7 +768,7 @@ function unmTabel(a) {
   const sub = h1.some((x) => /^(angka|huruf|indeks|sks|bobot|nilai)$/.test(normNama(unmSel(x)))) && !h1.some((x) => /\d/.test(unmSel(x)) && /[a-z]/i.test(unmSel(x)));
   const H = []; for (let c = 0; c < Math.max(h0.length, sub ? h1.length : 0); c++) H.push(normNama(unmSel(h0[c]) + ' ' + (sub ? unmSel(h1[c]) : '')));
   const col = (...res) => { for (const re of res) { const i = H.findIndex((x) => re.test(x)); if (i > -1) return i; } return -1; };
-  const C = { nim: col(/^nim$|^npm$/), namaMhs: col(/^nama mahasiswa$|^nama lengkap$/), kode: col(/^kode( mk| mata kuliah| matakuliah)$/, /^kode$/), nama: col(/^nama( mk| mata kuliah| matakuliah)$/, /^mata kuliah$/),
+  const C = { nim: col(/^nim$|^npm$/), namaMhs: col(/^nama mahasiswa$|^nama lengkap$|^nama mhs$/, /^nama$/), kode: col(/^kode( mk| mata kuliah| matakuliah)$/, /^kode$/), nama: col(/^nama( mk| mata kuliah| matakuliah)$/, /^mata kuliah$/),
     periode: col(/^periode/, /^tahun akademik/, /^semester$/), smt: col(/^semester ke/, /^smt/), sks: col(/^bobot/, /^sks( mk)?$/),
     angka: col(/nilai angka/, /^angka$/, /^nilai$/), huruf: col(/huruf/), indeks: H.findIndex((x) => /indeks/.test(x) && !/sks/.test(x)) };
   const sel = (r, c) => c > -1 ? r[c] : '';
@@ -788,9 +788,15 @@ async function unmBacaFile(file) {
   for (const nm of wb.SheetNames) {
     const a = await Excel.baris(wb, nm), t = unmTabel(a);
     if (!t || !t.rows.length) { lewat.push({ file: file.name, sheet: nm, alasan: t ? 'tabel nilai kosong' : 'tidak ada tabel berjudul Kode MK & Nama MK' }); continue; }
-    if (t.C.nim > -1) {                                                  // format daftar → kelompokkan per NIM
-      const g = {};
-      t.rows.forEach((x) => { if ((!x.nim && !x.namaMhs) || /^0+$/.test(x.nim)) return; const k = x.nim || '?' + x.namaMhs; (g[k] = g[k] || { file: file.name, sheet: nm, nim: x.nim, nama: x.namaMhs, prodi: '', rows: [] }).rows.push(bersih(x)); });
+    if (t.C.nim > -1 || t.C.namaMhs > -1) {                              // format daftar → kelompokkan per NIM (v1.4.1: atau per nama bila tanpa kolom NIM)
+      const g = {}; let prev = null;
+      t.rows.forEach((x) => {
+        if (!x.nim && !x.namaMhs && prev && x.baris === prev.baris + 1) { x.nim = prev.nim; x.namaMhs = prev.namaMhs; }   // v1.4.1: sel nama/NIM kosong (digabung) = mahasiswa baris di atasnya
+        prev = x;
+        if ((!x.nim && !x.namaMhs) || /^0+$/.test(x.nim)) return;
+        const k = x.nim || '?' + normNama(x.namaMhs); (g[k] = g[k] || { file: file.name, sheet: nm, nim: x.nim, nama: x.namaMhs, prodi: '', rows: [] }).rows.push(bersih(x));
+      });
+      if (!Object.keys(g).length) lewat.push({ file: file.name, sheet: nm, alasan: 'kolom NIM / Nama mahasiswa kosong' });
       Object.keys(g).forEach((k) => siswa.push(g[k]));
       continue;
     }
@@ -802,7 +808,7 @@ async function unmBacaFile(file) {
 }
 const UNM_ST = {
   simpan: ['s-SL', 'disimpan'], timpa: ['s-SX', 'diganti'], tandai: ['s-SD', 'ditandai dilapor'], ada: ['info', 'peta dilengkapi'], sama: ['no-dot', 'sudah ada'], kunci: ['s-SD', 'terkunci'],
-  beda: ['warn', 'berbeda'], mk: ['danger', 'MK tidak cocok'], nilai: ['danger', 'nilai kosong'], periode: ['danger', 'periode?'], ganda: ['no-dot', 'ganda'], tb: ['no-dot', 'tidak berlaku']
+  pindah: ['s-SL', 'dipindah'], beda: ['warn', 'berbeda'], mk: ['danger', 'MK tidak cocok'], nilai: ['danger', 'nilai kosong'], periode: ['danger', 'periode?'], ganda: ['no-dot', 'ganda'], tb: ['no-dot', 'tidak berlaku']
 };
 /** Modal unggah nilai per mahasiswa. o = { angk, prodi, setelah } */
 function unggahNilaiMhs(o) {
@@ -830,7 +836,7 @@ function unggahNilaiMhs(o) {
     box.innerHTML = '<div class="drop" id="un-drop">' + ic('upload') + '<div><b>Pilih atau seret file Excel nilai mahasiswa ke sini</b></div><div class="mt-4">Boleh beberapa file sekaligus (.xlsx / .xls / .csv) · satu file boleh berisi banyak sheet</div><input type="file" id="un-file" multiple accept=".xlsx,.xls,.csv" hidden></div>' +
       '<div class="un-contoh mt-16"><div class="lbl mb-4">Bentuk file yang dibaca (contoh satu sheet)</div><div class="un-lembar"><div class="un-id"><span>NIM</span><b class="mono">19.20.1.01</b><span>Nama</span><b>Nama Mahasiswa</b><span>Program Studi</span><b>S1 Ekonomi Syariah</b></div>' +
       '<table class="tbl tbl-compact"><thead><tr><th>No</th><th>Kode MK</th><th>Nama MK</th><th>Periode</th><th class="num">SKS</th><th class="num">Nilai Angka</th><th>Huruf</th><th class="num">Indeks</th></tr></thead><tbody><tr><td>1</td><td class="mono">ESY1418</td><td>Pengantar Akuntansi</td><td>2019/2020 Ganjil</td><td class="num">4</td><td class="num">98</td><td>A</td><td class="num">4</td></tr><tr><td>2</td><td class="mono">WAF1408ESY</td><td>Bahasa Arab I</td><td>2019/2020 Ganjil</td><td class="num">4</td><td class="num">86</td><td>B+</td><td class="num">3,66</td></tr></tbody></table></div>' +
-      '<div class="hint mt-8">Mahasiswa dicocokkan lewat <b>NIM</b> (cadangan: nama). Mata kuliah dicocokkan ke kurikulum angkatannya lewat <b>Kode MK</b> (spasi diabaikan; cadangan: nama MK). Nilai yang sudah dilapor tidak pernah diubah. Format daftar impor Neo Feeder (kolom NIM, Kode Mata Kuliah, Semester, Nilai Angka) juga bisa dibaca.</div></div>';
+      '<div class="hint mt-8">Mahasiswa dicocokkan lewat <b>NIM</b> (cadangan: nama). Mata kuliah dicocokkan ke kurikulum angkatannya lewat <b>Kode MK</b> (spasi diabaikan; cadangan: nama MK). Nilai yang sudah dilapor tidak pernah diubah. Format daftar impor Neo Feeder (kolom NIM, Kode Mata Kuliah, Semester, Nilai Angka) juga bisa dibaca, begitu pula daftar berkolom <b>Nama mahasiswa</b> tanpa NIM (nama cukup ditulis di baris pertama tiap mahasiswa).</div></div>';
     const drop = $('#un-drop', box), inp = $('#un-file', box);
     drop.onclick = () => inp.click();
     inp.onchange = () => { const f = Array.from(inp.files || []); inp.value = ''; if (f.length) baca(f); };
@@ -864,7 +870,7 @@ function unggahNilaiMhs(o) {
   }
   const kotak = (n, t, cls) => '<div' + (cls ? ' class="' + cls + '"' : '') + '><b>' + fmtInt(n) + '</b><span>' + esc(t) + '</span></div>';
   const pill = (s) => { const x = UNM_ST[s] || ['no-dot', s]; return '<span class="pill ' + x[0] + '">' + esc(x[1]) + '</span>'; };
-  const ketBaris = (x) => x.j === 'isi' ? 'Diisi ke peserta kelas ' + x.kl : x.j === 'tambah' ? 'Ditambahkan ke kelas ' + x.kl : x.j === 'baru' ? 'Kelas baru: ' + x.kl : x.j === 'tandai' ? 'Nilai sama sudah ada → ditandai sudah dilapor' : (x.k || '');
+  const ketBaris = (x) => x.j === 'isi' ? 'Diisi ke peserta kelas ' + x.kl : x.j === 'tambah' ? 'Ditambahkan ke kelas ' + x.kl : x.j === 'baru' ? 'Kelas baru: ' + x.kl : x.j === 'tandai' ? 'Nilai sama sudah ada → ditandai sudah dilapor' : x.j === 'pindah' ? (x.k || 'Dipindah ke kelas ' + x.kl) : (x.k || '');
   const perluCek = (h) => !h.cocok || h.peringatan.length || h.rows.some((x) => ['beda', 'mk', 'nilai', 'periode'].includes(x.s));
   function tahap2() {
     const H = st.hasil, R = H.ringkas, lewatBaris = R.sama + R.beda + R.kunci + R.mk + R.nilai + R.periode + R.ganda + R.tb;
@@ -878,6 +884,7 @@ function unggahNilaiMhs(o) {
       else alerts.push(['info', 'info', fmtInt(x.tanpaTahun) + ' MK kurikulum ' + esc(pr) + ' tidak punya tahun kurikulum sehingga diabaikan.' + tombol]);
     });
     if (R.mhsTidak) alerts.push(['warn', 'warn', '<b>' + R.mhsTidak + ' sheet belum cocok dengan mahasiswa mana pun.</b> Pilih mahasiswanya di kolom "Mahasiswa di sistem", atau biarkan (sheet itu dilewati).']);
+    if (R.pindah) alerts.push(['info', 'info', '<b>' + R.pindah + ' nilai akan dipindah</b> ke kelas teman seangkatannya. Mata kuliahnya tercatat di dua periode (mis. Ganjil &amp; Genap), jadi nilai terbaiknya disimpan di kelas periode paling awal. Nilai yang sudah dilapor tidak diubah, hanya kelasnya.' + (R.kelasKosong ? ' ' + R.kelasKosong + ' kelas PDDIKTI yang jadi kosong akan dihapus otomatis.' : '') + ' Bisa dibatalkan dari Riwayat unggahan.']);   // v1.4.1
     if (R.beda) alerts.push(['warn', 'warn', '<b>' + R.beda + ' nilai berbeda</b> dengan nilai yang sudah ada (belum dilapor). Centang <b>Timpa nilai yang berbeda</b> bila nilai di file yang benar.']);
     if (R.mk && !kurKosong.length) alerts.push(['info', 'info', '<b>' + R.mk + ' baris</b> kode MK-nya tidak ada di kurikulum angkatan tersebut — dilewati. Periksa kode di file atau kurikulum (menu Kurikulum).']);
     if (R.kunci) alerts.push(['info', 'lock', R.kunci + ' nilai sudah dilapor (terkunci) — tidak diubah.']);
@@ -955,14 +962,14 @@ function unggahNilaiMhs(o) {
   function hasilUnggah(r) {
     const d = r.data, ko = d.kohort[0] || {};
     modal({ judul: 'Nilai tersimpan', desc: '<span class="mono">' + esc(d.batch) + '</span>',
-      isi: '<div class="alert ok mb-12">' + ic('checkc') + '<div>' + esc(r.message) + '</div></div><div class="ringkas-batal">' + kotak(d.nilai, 'nilai baru') + kotak(d.timpa, 'nilai diganti') + kotak(d.mhs, 'mahasiswa') + kotak(d.kelasBaru, 'kelas PDDIKTI baru') + kotak(d.kelasLama, 'kelas lama diisi') + '</div>' +
+      isi: '<div class="alert ok mb-12">' + ic('checkc') + '<div>' + esc(r.message) + '</div></div><div class="ringkas-batal">' + kotak(d.nilai, 'nilai baru') + kotak(d.timpa, 'nilai diganti') + kotak(d.mhs, 'mahasiswa') + kotak(d.kelasBaru, 'kelas PDDIKTI baru') + kotak(d.kelasLama, 'kelas lama diisi') + (d.pindah ? kotak(d.pindah, 'nilai dipindah kelas') : '') + '</div>' +
         '<div class="hint mt-12">Kelas mengikuti periode di file (' + esc(d.periode.map(labelPeriode).join(', ')) + '). Semua kelas &amp; nilainya bisa dilihat sekaligus di <b>Rekap nilai angkatan</b>.' + (d.lapor ? ' Nilai sudah ditandai SUDAH DILAPOR.' : ' Status nilai: <b>Siap lapor</b>.') + '</div>',
       tombol: [{ teks: 'Tutup', aksi: () => true }].concat(ko.prodi ? [{ teks: 'Buka rekap ' + ko.prodi + ' ' + ko.angkatan, kelas: 'btn-primary', ikon: 'layers', aksi: () => { App.pergi('/perkuliahan/rekap?prodi=' + encodeURIComponent(ko.prodi) + '&angkatan=' + encodeURIComponent(ko.angkatan) + '&saring=semua'); return true; } }] : []) });
   }
   tahap1();
   return md;
 }
-const UNM_SIMPAN_FE = { simpan: 1, timpa: 1, tandai: 1, ada: 1 };
+const UNM_SIMPAN_FE = { simpan: 1, timpa: 1, tandai: 1, ada: 1, pindah: 1 };
 
 /* ==========================================================================
    v1.3 — "UNDUH DAFTAR" FORMAT IMPOR NILAI NEO FEEDER
