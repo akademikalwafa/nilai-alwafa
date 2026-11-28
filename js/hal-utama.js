@@ -469,14 +469,15 @@ Hal.kurikulum = {
     };
     $('#k-hapus', el).onclick = () => hapusKurikulum(f.prodi, f.tahun);
     $('#k-riw', el).onclick = () => f.tab === 'pddikti'
-      ? modalRiwayatBatch('Riwayat impor kurikulum', /^(KUR|KURDEL)-/, 'Impor yang keliru bisa dibatalkan. MK yang sudah dipakai (dipetakan / sudah dilapor) tetap dipertahankan.', () => tabs())
+      ? modalRiwayatBatch('Riwayat impor kurikulum', /^(KUR|KURDEL|KURTHN)-/, 'Impor yang keliru bisa dibatalkan. MK yang sudah dipakai (dipetakan / sudah dilapor) tetap dipertahankan.', () => tabs())
       : modalRiwayatBatch('Riwayat impor MK riil', /^MKR-/, 'Impor yang keliru bisa dibatalkan. MK riil yang sudah dipakai kelas atau Peta Klaim tetap dipertahankan.', () => tabs());
     const tabPddikti = () => {
       const kur = App.M.kurikulum.filter((k) => k.prodi === f.prodi);
       const tahun = Array.from(new Set(kur.map((k) => String(k.tahun_kurikulum)))).sort().reverse();
       if (!tahun.includes(f.tahun)) f.tahun = tahun[0] || '';
-      $('#k-isi', el).innerHTML = '<div class="card"><div class="toolbar"><select class="input" id="k-prodi">' + opsi(App.prodi().map((x) => ({ v: x.kode, t: x.kode + ' — ' + x.nama })), f.prodi) + '</select><select class="input" id="k-tahun">' + (tahun.length ? opsi(tahun, f.tahun, (t) => 'Kurikulum ' + t) : '<option value="">Belum ada kurikulum</option>') + '</select><div class="search" style="width:220px">' + ic('search') + '<input class="input" id="k-q" placeholder="Cari kode / nama…" value="' + esc(f.q) + '"></div><span id="k-total" class="pill brand no-dot"></span><span class="spacer"></span><button class="btn btn-sm" id="k-impor">' + ic('upload') + 'Impor Sebaran MK</button><button class="btn btn-sm btn-primary" id="k-tambah">' + ic('plus') + 'Tambah MK</button></div><div id="k-tbl"></div></div>' +
-        '<div class="alert info mt-12">' + ic('info') + '<div>Kurikulum yang berlaku bagi suatu angkatan = tahun kurikulum terbaru yang ≤ tahun angkatan. Tandai MK <b>SEMINAR</b> dan <b>SKRIPSI</b> agar cek kelulusan berjalan.</div></div>';
+      $('#k-isi', el).innerHTML = '<div class="card"><div class="toolbar"><select class="input" id="k-prodi">' + opsi(App.prodi().map((x) => ({ v: x.kode, t: x.kode + ' — ' + x.nama })), f.prodi) + '</select><select class="input" id="k-tahun">' + (tahun.length ? opsi(tahun, f.tahun, (t) => t ? 'Kurikulum ' + t : '⚠ Tanpa tahun kurikulum') : '<option value="">Belum ada kurikulum</option>') + '</select><div class="search" style="width:220px">' + ic('search') + '<input class="input" id="k-q" placeholder="Cari kode / nama…" value="' + esc(f.q) + '"></div><span id="k-total" class="pill brand no-dot"></span><span class="spacer"></span><button class="btn btn-sm" id="k-impor">' + ic('upload') + 'Impor Sebaran MK</button><button class="btn btn-sm btn-primary" id="k-tambah">' + ic('plus') + 'Tambah MK</button></div><div id="k-tbl"></div></div>' +
+        '<div class="alert info mt-12">' + ic('info') + '<div>Kurikulum yang berlaku bagi suatu angkatan = tahun kurikulum terbaru yang ≤ tahun angkatan. Tandai MK <b>SEMINAR</b> dan <b>SKRIPSI</b> agar cek kelulusan berjalan.</div></div>' +
+        (tahun.includes('') && typeof isiTahunKurikulum === 'function' ? '<div class="alert warn mt-12">' + ic('warn') + '<div><b>' + kur.filter((k) => !String(k.tahun_kurikulum ?? '').trim()).length + ' MK kurikulum ' + esc(f.prodi) + ' belum punya tahun kurikulum</b>, jadi belum berlaku untuk angkatan mana pun (tidak muncul di Peta Klaim, Rekap, maupun Unggah nilai).<div class="mt-8"><button class="btn btn-sm" id="k-isitahun">' + ic('edit', 'ic-sm') + 'Isi tahun kurikulum…</button></div></div></div>' : '');   // v1.3.1
       const t = Tabel($('#k-tbl', el), { id: (r) => r.id, urut: 'smt_sebaran', semua: true, tinggi: true, kolom: [
         { k: 'smt_sebaran', label: 'Smt', cls: 'center', val: (r) => Number(r.smt_sebaran) },
         { k: 'kode_mk', label: 'Kode', cls: 'mono nowrap' },
@@ -492,6 +493,7 @@ Hal.kurikulum = {
       $('#k-q', el).oninput = debounce((e) => { f.q = e.target.value; t.cari(f.q); }, 150);
       $('#k-tambah', el).onclick = () => formMk({ prodi: f.prodi, tahun_kurikulum: f.tahun || String(App.periodeAktif).slice(0, 4), aktif: 1 });
       $('#k-impor', el).onclick = () => imporSebaran(f.prodi, f.tahun);
+      if ($('#k-isitahun', el)) $('#k-isitahun', el).onclick = () => isiTahunKurikulum(f.prodi, '', (t) => { f.tahun = t; tabs(); });   // v1.3.1
       $('#k-tahun', el).addEventListener('change', tombolKepala);
       tombolKepala();
     };
@@ -518,6 +520,7 @@ Hal.kurikulum = {
       modal({ judul: baru ? 'Tambah MK kurikulum' : 'Ubah MK kurikulum', isi: '<div class="fgrid"><div class="field"><label>Prodi</label><select class="input" name="prodi">' + opsi(App.prodi().map((x) => x.kode), r.prodi) + '</select></div><div class="field"><label>Tahun kurikulum</label><input class="input" name="tahun_kurikulum" value="' + esc(r.tahun_kurikulum || '') + '" inputmode="numeric"></div><div class="field"><label class="req">Kode MK</label><input class="input mono" name="kode_mk" value="' + esc(r.kode_mk || '') + '"></div><div class="field"><label class="req">SKS</label><input class="input" type="number" min="0" max="12" name="sks" value="' + esc(r.sks || '') + '"></div><div class="field full"><label class="req">Nama MK</label><input class="input" name="nama_mk" value="' + esc(r.nama_mk || '') + '"></div><div class="field"><label>Semester sebaran</label><input class="input" type="number" min="1" max="14" name="smt_sebaran" value="' + esc(r.smt_sebaran || '') + '"></div><div class="field"><label>Jenis</label><select class="input" name="jenis">' + opsi([{ v: '', t: 'MK biasa' }, { v: 'SEMINAR', t: 'Seminar (syarat lulus)' }, { v: 'SKRIPSI', t: 'Skripsi (syarat lulus)' }], r.jenis || '') + '</select></div>' + (baru ? '' : '<div class="field full"><label class="check"><input type="checkbox" name="aktif" ' + (String(r.aktif) !== '0' ? 'checked' : '') + '>MK aktif</label></div>') + '</div>',
         tombol: [{ teks: 'Batal', aksi: () => true }, { teks: 'Simpan', kelas: 'btn-primary', aksi: async (close, m) => {
           const row = bacaForm(m); if (!baru) row.id = r.id; row.aktif = row.aktif === false ? 0 : 1;
+          if (!/^\d{4}$/.test(String(row.tahun_kurikulum || '').trim())) { toast('Isi Tahun kurikulum (4 angka, mis. 2019).', 'warn'); return false; }   // v1.3.1
           const res = await api('master.simpan', { tabel: 'Kurikulum', row: row });
           if (!res.success) { toast(res.message, 'err'); return false; }
           await App.segarkanMaster(); toast('MK tersimpan.'); f.tahun = row.tahun_kurikulum; tabs(); return true;
@@ -529,6 +532,7 @@ Hal.kurikulum = {
         isi: '<div class="row mb-12"><div class="field"><label>Prodi</label><select class="input" id="is-prodi">' + opsi(App.prodi().map((x) => x.kode), prodi) + '</select></div><div class="field"><label>Tahun kurikulum</label><input class="input" id="is-tahun" value="' + esc(tahun || String(App.periodeAktif).slice(0, 4)) + '" style="width:120px"></div><div class="field" style="flex:1"><label>Sheet</label><select class="input" id="is-sheet" disabled><option>—</option></select></div></div><div class="drop" id="is-drop">' + ic('upload') + '<div><b>Pilih file .xlsx</b></div><input type="file" hidden id="is-file" accept=".xlsx,.xls"></div><div id="is-prev" class="mt-12"></div>',
         tombol: [{ teks: 'Batal', aksi: () => true }, { teks: 'Impor', kelas: 'btn-primary', aksi: async (close, m) => {
           if (!rows.length) { toast('Belum ada baris terbaca.', 'warn'); return false; }
+          if (!/^\d{4}$/.test($('#is-tahun', m).value.trim())) { toast('Isi Tahun kurikulum (4 angka, mis. 2019) — tanpa tahun, kurikulum tidak berlaku untuk angkatan mana pun.', 'warn', 6000); return false; }   // v1.3.1
           const isi = rows.map((x) => Object.assign({ prodi: $('#is-prodi', m).value, tahun_kurikulum: $('#is-tahun', m).value.trim() }, x));
           const res = await api('master.impor', { tabel: 'Kurikulum', rows: isi, file: namaFile });
           if (!res.success) { toast(res.message, 'err'); return false; }

@@ -246,7 +246,7 @@ function SetSinkron(box, ctx) {
 }
 function riwayatBatch(rows, semua) {
   const r = (rows || []).filter((b) => semua || /^MIG-/.test(b.id));
-  return r.length ? '<div class="tbl-wrap" style="max-height:340px"><table class="tbl tbl-compact"><thead><tr><th>Waktu</th><th>Jenis</th><th>Sumber</th><th class="num">Berhasil</th><th class="num">Dilewati</th><th>Oleh</th><th></th></tr></thead><tbody>' + r.map((b) => '<tr' + (b.dibatalkan ? ' class="r-off"' : '') + '><td class="nowrap">' + esc(fmtWaktu(b.at)) + '</td><td><span class="pill no-dot ' + (/^MIG/.test(b.jenis) ? 'info' : 'brand') + '">' + esc(b.jenis) + '</span></td><td>' + esc(b.sumber) + '<div class="sub mono">' + esc(b.id) + '</div></td><td class="num">' + fmtInt(b.berhasil) + '</td><td class="num">' + fmtInt(b.dilewati) + '</td><td>' + esc(b.oleh) + '</td><td class="aksi">' + (b.dibatalkan ? '<span class="sub">dibatalkan ' + esc(fmtWaktu(String(b.dibatalkan).slice(0, 19))) + '</span>' : /^(MIG|KUR|MKR|KURDEL|PDK|PETADEL|LULUS|UNM)-/.test(b.id) ? '<button class="btn btn-xs" data-batal="' + esc(b.id) + '">' + ic('repeat', 'ic-sm') + 'Batalkan</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>' : kosong('Belum ada riwayat', '', 'history');
+  return r.length ? '<div class="tbl-wrap" style="max-height:340px"><table class="tbl tbl-compact"><thead><tr><th>Waktu</th><th>Jenis</th><th>Sumber</th><th class="num">Berhasil</th><th class="num">Dilewati</th><th>Oleh</th><th></th></tr></thead><tbody>' + r.map((b) => '<tr' + (b.dibatalkan ? ' class="r-off"' : '') + '><td class="nowrap">' + esc(fmtWaktu(b.at)) + '</td><td><span class="pill no-dot ' + (/^MIG/.test(b.jenis) ? 'info' : 'brand') + '">' + esc(b.jenis) + '</span></td><td>' + esc(b.sumber) + '<div class="sub mono">' + esc(b.id) + '</div></td><td class="num">' + fmtInt(b.berhasil) + '</td><td class="num">' + fmtInt(b.dilewati) + '</td><td>' + esc(b.oleh) + '</td><td class="aksi">' + (b.dibatalkan ? '<span class="sub">dibatalkan ' + esc(fmtWaktu(String(b.dibatalkan).slice(0, 19))) + '</span>' : /^(MIG|KUR|MKR|KURDEL|PDK|PETADEL|LULUS|UNM|KURTHN|KLSDEL)-/.test(b.id) ? '<button class="btn btn-xs" data-batal="' + esc(b.id) + '">' + ic('repeat', 'ic-sm') + 'Batalkan</button>' : '') + '</td></tr>').join('') + '</tbody></table></div>' : kosong('Belum ada riwayat', '', 'history');
 }
 async function batalBatch(id, after) {
   if (!/^MIG-/.test(id)) return batalBatchUmum(id, after);          // v1.1: KUR/MKR/KURDEL/PDK
@@ -256,7 +256,7 @@ async function batalBatch(id, after) {
 }
 
 /* ---------------------------------------------------------------- v1.1: pembatalan batch impor kurikulum / MK riil / hapus kurikulum / kelas PDDIKTI */
-const JENIS_BATCH_V11 = { KUR: 'Impor kurikulum', MKR: 'Impor MK riil', KURDEL: 'Hapus kurikulum', PDK: 'Kelas PDDIKTI', PETADEL: 'Hapus peta klaim', LULUS: 'Tandai lulus', UNM: 'Unggah nilai per mahasiswa' };
+const JENIS_BATCH_V11 = { KUR: 'Impor kurikulum', MKR: 'Impor MK riil', KURDEL: 'Hapus kurikulum', PDK: 'Kelas PDDIKTI', PETADEL: 'Hapus peta klaim', LULUS: 'Tandai lulus', UNM: 'Unggah nilai per mahasiswa', KURTHN: 'Isi tahun kurikulum', KLSDEL: 'Hapus kelas' };
 async function batalBatchUmum(id, after) {
   const c = await api('batch.cekBatal', { batch: id });
   if (!c.success) { toast(c.message, 'err'); return; }
@@ -266,6 +266,8 @@ async function batalBatchUmum(id, after) {
     ? kotak(R.kelas, 'kelas dihapus') + kotak(R.peserta, 'peserta dihapus') + kotak(R.peta, 'aturan peta dikembalikan') + kotak(R.bernilai, 'peserta sudah bernilai')
     : jenis === 'PETADEL' ? kotak(R.dikembalikan, 'aturan peta dikembalikan') + kotak(R.dipertahankan, 'dilewati (sudah ada aturan baru)')
     : jenis === 'LULUS' ? kotak(R.mhs, 'mahasiswa kembali ke status sebelumnya') + kotak(R.dipertahankan, 'dipertahankan (sudah final / berubah)')
+    : jenis === 'KLSDEL' ? kotak(R.kelas, 'kelas dikembalikan') + kotak(R.peserta, 'baris peserta dikembalikan') + kotak(R.nilai, 'nilai dikembalikan')
+    : jenis === 'KURTHN' ? kotak(R.mk, 'MK kembali tanpa tahun kurikulum') + kotak(R.dipertahankan, 'MK dipertahankan (sudah dipakai / diubah)')
     : jenis === 'UNM' ? kotak(R.nilai, 'nilai dihapus') + kotak(R.dipulihkan, 'nilai dikembalikan ke semula') + kotak(R.lapor, 'tanda dilapor dicabut') + kotak(R.kelas, 'kelas PDDIKTI dihapus') + kotak(R.peta, 'aturan peta dikembalikan')
     : kotak(R.dihapus, 'MK dihapus') + kotak(R.dipulihkan, 'MK dikembalikan ke data lama') + kotak(R.dikembalikan, 'MK yang dihapus dipulihkan') + kotak(R.dipertahankan, 'MK dipertahankan (sudah dipakai)');
   const tetap = (d.tetap || []).length ? '<div class="mt-12"><div class="lbl mb-4">' + (jenis === 'LULUS' || jenis === 'PETADEL' || jenis === 'UNM' ? 'Tidak ikut dikembalikan' : 'Dipertahankan karena sudah dipakai') + '</div><div class="tbl-wrap" style="max-height:200px"><table class="tbl tbl-compact"><tbody>' + d.tetap.map((x) => '<tr><td class="mono nowrap">' + esc(x.kode) + '</td><td>' + esc(x.nama) + '</td><td class="sub">' + esc(x.alasan) + '</td></tr>').join('') + '</tbody></table></div></div>' : '';
@@ -283,7 +285,7 @@ async function batalBatchUmum(id, after) {
   if (!ok) return;
   const r = await api('batch.batal', { batch: id, konfirmasi: 'BATAL' });
   toast(r.message, r.success ? 'ok' : 'err', 7000);
-  if (r.success && (jenis === 'KUR' || jenis === 'MKR' || jenis === 'KURDEL' || jenis === 'PDK' || jenis === 'UNM')) await App.segarkanMaster();
+  if (r.success && (jenis === 'KUR' || jenis === 'MKR' || jenis === 'KURDEL' || jenis === 'PDK' || jenis === 'UNM' || jenis === 'KURTHN')) await App.segarkanMaster();
   if (after) after();
 }
 /** Modal riwayat batch tertentu (dipakai halaman Kurikulum & Rekap angkatan). */

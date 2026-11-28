@@ -476,3 +476,10 @@ tr.un-mhs.buka td { background: var(--brand-50); }
 tr.un-det > td { background: #FBFCFD; padding: 6px 10px 10px 34px; }
 .un-dalam { background: var(--surface); border: 1px solid var(--line-2); border-radius: 8px; }
 .un-dalam td .sub { display: inline; }
+
+/* ===================== v1.4 — hapus kelas (MK dihapus) ===================== */
+.k-lebar { grid-column: 1 / -1; }
+.k-lebar .alert { margin: 0; }
+.k-card.k-yatim { border-color: #F4C7C3; background: #FFFBFA; }
+.k-card.k-yatim .k-mk { color: var(--danger); }
+.danger-t { color: var(--danger); font-weight: 600; }

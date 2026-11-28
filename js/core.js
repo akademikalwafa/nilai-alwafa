@@ -4,7 +4,7 @@
    UI kit: toast, modal, konfirmasi ketik, tabel, skeleton, cetak A4, lazy-lib
    ========================================================================== */
 'use strict';
-const APP_VER = '1.3.0';
+const APP_VER = '1.4.0';
 const $ = (s, el) => (el || document).querySelector(s);
 const $$ = (s, el) => Array.from((el || document).querySelectorAll(s));
 const esc = (v) => String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -54,7 +54,8 @@ const READ = new Set(['ping', 'boot', 'auth.me', 'master.get', 'pengaturan.get',
   'dasbor.sebaran', 'batch.list', 'doc.templateList', 'doc.pejabatList', 'doc.list', 'doc.antrean',
   'kelas.angkatan', 'kelas.pddiktiCek', 'batch.cekBatal', 'kurikulum.hapusCek',   // v1.1
   'sheet.cek', 'sheet.status', 'klaim.hapusCek',                                    // v1.2
-  'unggahNilai.cek', 'nilai.feeder']);                                                // v1.3
+  'unggahNilai.cek', 'nilai.feeder',                                                 // v1.3
+  'kelas.hapusCek']);                                                                 // v1.4
 const Net = {
   n: 0,
   bar() { return $('#netbar'); },

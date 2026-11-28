@@ -82,7 +82,12 @@ function HalKelasKartu(el, ctx, q) {
       '<div class="k-box">' + r('Kelas', ks.length + ' kelas') + r('Mahasiswa aktif', fmtInt(akt) + (lulus ? ' <span class="sub">· ' + fmtInt(lulus) + ' lulus</span>' : '')) + r('Nilai terisi', fmtInt(j.isi) + ' / ' + fmtInt(j.pes) + ' ' + pillIsi(j.isi, j.pes)) + bar(j.isi, j.pes) + '</div>' +
       '<a class="btn btn-primary btn-blok" href="' + keAngk(angk) + '&prodi=' + encodeURIComponent(p.kode) + '">Lihat kelas ' + ic('next', 'ic-sm') + '</a></div>';
   };
+  const yatimK = (k) => k.mk === '(MK dihapus)';                                      // v1.4: MK riil kelas ini sudah dihapus
   const kartuKelas = (k) => {
+    if (yatimK(k)) return '<div class="k-card k-kelas k-yatim" data-id="' + esc(k.id) + '"><div class="row" style="gap:6px"><span class="k-tag abu">' + esc(/^pd-/.test(k.mk_riil_id) ? 'PDDIKTI' : progLabel(k.program)) + '</span><span class="spacer"></span><span class="pill danger">MK dihapus</span></div>' +
+      '<div class="k-mk">(MK dihapus)</div><div class="k-sub">MK riil kelas ini sudah dihapus, kelasnya tertinggal</div>' +
+      '<div class="k-box">' + r('Peserta', fmtInt(k.peserta)) + r('Nilai terisi', fmtInt(k.terisi) + ' / ' + fmtInt(k.peserta)) + r('Periode', esc(labelPeriode(k.periode))) + '</div>' +
+      '<div class="row k-dua"><a class="btn btn-blok" href="#/perkuliahan/' + encodeURIComponent(k.id) + '">Buka</a><button class="btn btn-danger btn-blok" data-hapus-kelas="' + esc(k.id) + '">' + ic('trash', 'ic-sm') + 'Hapus kelas</button></div></div>';
     const pd = /^pd-/.test(k.mk_riil_id), st = !k.peserta ? '<span class="pill no-dot">Tanpa peserta</span>' : pillIsi(k.terisi, k.peserta);
     return '<div class="k-card k-kelas" data-id="' + esc(k.id) + '"><div class="row" style="gap:6px"><span class="k-tag">' + esc(pd ? 'PDDIKTI' : progLabel(k.program)) + '</span>' + (k.rombel && k.rombel !== 'A' ? '<span class="pill no-dot">Rombel ' + esc(k.rombel) + '</span>' : '') + '<span class="spacer"></span>' + st + '</div>' +
       '<div class="k-mk" title="' + esc(k.mk) + '">' + esc(k.mk) + '</div><div class="k-sub">' + esc(k.sks) + ' SKS · semester ' + k.smt + (pd ? ' · tanpa MK riil' : k.batch ? ' · hasil migrasi' : '') + '</div>' +
@@ -132,20 +137,24 @@ function HalKelasKartu(el, ctx, q) {
   const gambarKelas = (ks) => {
     const qn = normNama(cari);
     const rs = ks.filter((k) => (!saringProg || (saringProg === 'PDDIKTI' ? /^pd-/.test(k.mk_riil_id) : k.program === saringProg && !/^pd-/.test(k.mk_riil_id))) && (!qn || normNama(k.mk + ' ' + (k.dosen || '')).includes(qn)));
-    $('#kk-isi', el).innerHTML = rs.length ? rs.map(kartuKelas).join('') : '<div class="k-penuh">' + kosong(ks.length ? 'Tidak ada kelas yang cocok' : 'Belum ada kelas ' + prodi + ' angkatan ' + angk, ks.length ? 'Ubah saringan atau kata kunci.' : 'Di periode ' + esc(labelPeriode(per)) + ' belum ada kelas untuk ' + esc(prodiNama(prodi)) + ' angkatan ' + esc(angk) + '.', 'clip') +
-      (ks.length ? '' : '<div class="row" style="justify-content:center;gap:8px;margin-top:-8px"><button class="btn" data-aksi="tambah1">' + ic('plus', 'ic-sm') + 'Tambah kelas</button><button class="btn" data-aksi="pdk1">' + ic('lapor', 'ic-sm') + 'Kelas PDDIKTI</button><button class="btn" data-aksi="unm1">' + ic('upload', 'ic-sm') + 'Unggah nilai</button><button class="btn btn-primary" data-aksi="gen">' + ic('spark', 'ic-sm') + 'Buat kelas otomatis</button></div>') + '</div>';
+    const yt = ks.filter(yatimK);                                                     // v1.4
+    $('#kk-isi', el).innerHTML = (yt.length ? '<div class="k-lebar"><div class="alert warn">' + ic('warn') + '<div><b>' + yt.length + ' kelas MK riilnya sudah dihapus</b> (tampil "(MK dihapus)"). Menghapus MK riil tidak ikut menghapus kelasnya, jadi kelas &amp; ' + fmtInt(yt.reduce((t, k) => t + (k.peserta || 0), 0)) + ' baris pesertanya masih tersimpan. Hapus bila memang tidak dipakai — bisa dibatalkan.<div class="mt-8"><button class="btn btn-sm btn-danger" data-hapus-yatim="1">' + ic('trash', 'ic-sm') + 'Hapus ' + yt.length + ' kelas ini…</button></div></div></div></div>' : '') +
+      (rs.length ? rs.map(kartuKelas).join('') : '<div class="k-penuh">' + kosong(ks.length ? 'Tidak ada kelas yang cocok' : 'Belum ada kelas ' + prodi + ' angkatan ' + angk, ks.length ? 'Ubah saringan atau kata kunci.' : 'Di periode ' + esc(labelPeriode(per)) + ' belum ada kelas untuk ' + esc(prodiNama(prodi)) + ' angkatan ' + esc(angk) + '.', 'clip') +
+      (ks.length ? '' : '<div class="row" style="justify-content:center;gap:8px;margin-top:-8px"><button class="btn" data-aksi="tambah1">' + ic('plus', 'ic-sm') + 'Tambah kelas</button><button class="btn" data-aksi="pdk1">' + ic('lapor', 'ic-sm') + 'Kelas PDDIKTI</button><button class="btn" data-aksi="unm1">' + ic('upload', 'ic-sm') + 'Unggah nilai</button><button class="btn btn-primary" data-aksi="gen">' + ic('spark', 'ic-sm') + 'Buat kelas otomatis</button></div>') + '</div>');
   };
   pakai(ctx, 'kelas.list', { periode: per }, (d) => { K = d; gambar(); });
   pakai(ctx, 'mhs.list', {}, (d) => { M = d; gambar(); });
   const prodiPilih = () => prodi || (App.prodi()[0] || {}).kode;
   root.addEventListener('click', (e) => {
-    const b = e.target.closest('[data-aksi],[data-rekap],[data-pdk],[data-lulus],[data-unm],#kk-prog button');
+    const b = e.target.closest('[data-aksi],[data-rekap],[data-pdk],[data-lulus],[data-unm],[data-hapus-kelas],[data-hapus-yatim],#kk-prog button');
     if (!b) return;
     if (b.closest('#kk-prog')) { saringProg = b.dataset.v; $$('#kk-prog button', el).forEach((x) => x.classList.toggle('on', x === b)); gambarKelas(kelasDari(angk, prodi).sort((a, c) => String(a.mk).localeCompare(String(c.mk)))); return; }
     if (b.dataset.rekap) return App.pergi('/perkuliahan/rekap?prodi=' + encodeURIComponent(prodiPilih()) + '&angkatan=' + encodeURIComponent(b.dataset.rekap));
     if (b.dataset.pdk) return kelasPddikti({ prodi: prodiPilih(), angk: b.dataset.pdk, status: ['Lulus'] });
     if (b.dataset.lulus) return tandaiLulus({ angk: b.dataset.lulus, setelah: () => App.render() });
     if (b.dataset.unm) return unggahNilaiMhs({ angk: b.dataset.unm, setelah: () => App.render() });   // v1.3
+    if (b.dataset.hapusKelas) return hapusKelas([b.dataset.hapusKelas], () => App.render());          // v1.4
+    if (b.dataset.hapusYatim) return hapusKelas(kelasDari(angk, prodi).filter(yatimK).map((k) => k.id), () => App.render());
     const a = b.dataset.aksi;
     if (a === 'gen') buatKelasOtomatis(prodiPilih());
     if (a === 'tambah1') tambahKelas(prodiPilih(), angk);
@@ -255,7 +264,7 @@ function HalNilai(el, ctx, kelasId) {
       (D.klaim.length ? '<span class="pill brand no-dot" title="Diklaim untuk MK PDDIKTI">' + ic('route', 'ic-sm') + ' ' + esc(D.klaim.join(' · ')) + '</span>' : '<a class="pill warn no-dot" href="#/klaim?prodi=' + esc(k.prodi) + '&angkatan=' + esc(k.ikut_angkatan) + '">' + ic('warn', 'ic-sm') + ' Belum diklaim ke MK PDDIKTI</a>') + '</div></div>' +
       '<div class="field" style="width:280px"><label>Dosen pengampu</label><select class="input" id="nv-dosen">' + opsi(App.M.dosen.filter((x) => String(x.aktif) !== '0' || x.id === k.dosen_id).map((x) => ({ v: x.id, t: x.nama })), k.dosen_id, null, '— pilih dosen —') + '</select></div></div>' +
       '<div class="row-wrap mt-12" style="gap:18px"><span><b>' + rows.length + '</b> <span class="muted">peserta</span></span><span><b>' + terisi + '</b> <span class="muted">bernilai</span></span><span><b>' + kunci + '</b> <span class="muted">sudah dilapor (terkunci)</span></span><span id="nv-rata" class="muted"></span></div></div></div>' +
-      '<div class="card mt-16"><div class="toolbar"><button class="btn btn-sm" id="nv-tempel">' + ic('paste') + 'Tempel dari Excel</button><button class="btn btn-sm" id="nv-unggah">' + ic('upload') + 'Unggah Excel</button><input type="file" id="nv-file" accept=".xlsx,.xls,.csv" hidden><button class="btn btn-sm" id="nv-templat" title="Daftar nilai kelas ini dalam format impor nilai Neo Feeder (kode & nama MK PDDIKTI, semester, nama kelas, prodi)">' + ic('download') + 'Unduh daftar</button><button class="btn btn-sm" id="nv-peserta">' + ic('users') + 'Peserta</button><span class="spacer"></span><span class="muted" style="font-size:12.5px"><span class="kbd">↑</span><span class="kbd">↓</span>/<span class="kbd">Enter</span> pindah baris · tempel kolom nilai langsung ke sel</span></div>' +
+      '<div class="card mt-16"><div class="toolbar"><button class="btn btn-sm" id="nv-tempel">' + ic('paste') + 'Tempel dari Excel</button><button class="btn btn-sm" id="nv-unggah">' + ic('upload') + 'Unggah Excel</button><input type="file" id="nv-file" accept=".xlsx,.xls,.csv" hidden><button class="btn btn-sm" id="nv-templat" title="Daftar nilai kelas ini dalam format impor nilai Neo Feeder (kode & nama MK PDDIKTI, semester, nama kelas, prodi)">' + ic('download') + 'Unduh daftar</button><button class="btn btn-sm" id="nv-peserta">' + ic('users') + 'Peserta</button><button class="btn btn-sm btn-ghost" id="nv-hapus" style="color:var(--danger)" title="Hapus kelas ini beserta daftar pesertanya (bisa dibatalkan)">' + ic('trash') + 'Hapus kelas</button><span class="spacer"></span><span class="muted" style="font-size:12.5px"><span class="kbd">↑</span><span class="kbd">↓</span>/<span class="kbd">Enter</span> pindah baris · tempel kolom nilai langsung ke sel</span></div>' +
       '<div class="tbl-wrap tall"><table class="sheet" id="nv-grid"><thead><tr><th style="width:44px">No</th><th style="width:130px">NIM</th><th>Nama mahasiswa</th><th style="width:110px">Status</th><th style="width:120px;text-align:right">Nilai akhir</th><th style="width:70px">Huruf</th><th style="width:70px;text-align:right">Indeks</th><th style="width:170px">Lapor PDDIKTI</th></tr></thead><tbody>' +
       rows.map((r, i) => {
         const v = ubah[r.nim] !== undefined ? ubah[r.nim] : r.akhir, sk = skala(parseAngka(v));
@@ -297,6 +306,7 @@ function HalNilai(el, ctx, kelasId) {
     $('#nv-file', el).onchange = async (e) => { const f = e.target.files[0]; e.target.value = ''; if (!f) return; try { pratinjauTabel(await bacaFileNilai(f), 'unggah'); } catch (err) { toast(err.message, 'err'); } };
     $('#nv-templat', el).onclick = (e) => tombolProses(e.currentTarget, () => unduhDaftarFeeder(k, kelasId));   // v1.3: format impor nilai Neo Feeder
     $('#nv-peserta', el).onclick = () => kelolaPeserta();
+    $('#nv-hapus', el).onclick = () => hapusKelas([kelasId], () => App.pergi(App.ingat('kls_rute') || '/perkuliahan'));   // v1.4
   };
   const statusBar = () => {
     const n = jumlahUbah(), bad = Object.keys(ubah).filter((k) => ubah[k] !== '' && (isNaN(ubah[k]) || ubah[k] < 0 || ubah[k] > 100)).length;
@@ -812,6 +822,7 @@ function unggahNilaiMhs(o) {
   const aturTombol = () => {
     const R = st.hasil && st.hasil.ringkas, n = R ? R.ditulis : 0;
     btnSimpan.disabled = !n; btnSimpan.innerHTML = ic('save') + (n ? 'Simpan ' + fmtInt(n) + ' nilai' : 'Simpan nilai');
+    btnSimpan.title = n ? '' : 'Belum ada nilai yang bisa disimpan';
   };
   aturTombol();
   const tahap1 = () => {
@@ -858,14 +869,22 @@ function unggahNilaiMhs(o) {
   function tahap2() {
     const H = st.hasil, R = H.ringkas, lewatBaris = R.sama + R.beda + R.kunci + R.mk + R.nilai + R.periode + R.ganda + R.tb;
     const daftar = H.siswa.filter((h) => !st.perlu || perluCek(h));
-    const alerts = [];
+    const alerts = [], kurKosong = (R.kurikulum || []).filter((x) => x.kosong);
+    unikk((R.kurikulum || []).map((x) => x.prodi)).forEach((pr) => {                      // v1.3.1: kurikulum belum berlaku
+      const x = R.kurikulum.find((y) => y.prodi === pr && y.kosong) || R.kurikulum.find((y) => y.prodi === pr);
+      const tombol = x.tanpaTahun ? '<div class="mt-8"><button class="btn btn-sm" data-isi-tahun="' + esc(pr) + '" data-saran="' + esc(x.angkatan) + '">' + ic('edit', 'ic-sm') + 'Isi tahun kurikulum ' + esc(pr) + '…</button></div>' : '';
+      if (x.kosong && x.tanpaTahun) alerts.push(['danger', 'xc', '<b>Kurikulum ' + esc(pr) + ' belum punya Tahun kurikulum</b> (' + fmtInt(x.tanpaTahun) + ' MK). Karena itu kurikulum ' + esc(pr) + ' belum berlaku untuk angkatan mana pun, sehingga semua kode MK di file terbaca "MK tidak cocok". Isi tahunnya sekali saja — pratinjau diperbarui otomatis.' + tombol]);
+      else if (x.kosong) alerts.push(['danger', 'xc', '<b>Kurikulum ' + esc(pr) + ' belum ada.</b> Impor dulu lewat menu <b>Kurikulum → Impor Sebaran MK</b>, lalu pilih file ini lagi.']);
+      else alerts.push(['info', 'info', fmtInt(x.tanpaTahun) + ' MK kurikulum ' + esc(pr) + ' tidak punya tahun kurikulum sehingga diabaikan.' + tombol]);
+    });
     if (R.mhsTidak) alerts.push(['warn', 'warn', '<b>' + R.mhsTidak + ' sheet belum cocok dengan mahasiswa mana pun.</b> Pilih mahasiswanya di kolom "Mahasiswa di sistem", atau biarkan (sheet itu dilewati).']);
     if (R.beda) alerts.push(['warn', 'warn', '<b>' + R.beda + ' nilai berbeda</b> dengan nilai yang sudah ada (belum dilapor). Centang <b>Timpa nilai yang berbeda</b> bila nilai di file yang benar.']);
-    if (R.mk) alerts.push(['info', 'info', '<b>' + R.mk + ' baris</b> kode MK-nya tidak ada di kurikulum angkatan tersebut — dilewati. Periksa kode di file atau kurikulum (menu Kurikulum).']);
+    if (R.mk && !kurKosong.length) alerts.push(['info', 'info', '<b>' + R.mk + ' baris</b> kode MK-nya tidak ada di kurikulum angkatan tersebut — dilewati. Periksa kode di file atau kurikulum (menu Kurikulum).']);
     if (R.kunci) alerts.push(['info', 'lock', R.kunci + ' nilai sudah dilapor (terkunci) — tidak diubah.']);
     if (st.lewat.length) alerts.push(['info', 'info', st.lewat.length + ' sheet dilewati: ' + esc(st.lewat.slice(0, 5).map((x) => x.sheet + ' (' + x.alasan + ')').join(', ')) + (st.lewat.length > 5 ? ', …' : '')]);
     box.innerHTML = '<div class="row-wrap mb-12" style="gap:6px">' + st.files.slice(0, 6).map((f) => '<span class="pill no-dot">' + ic('sheet', 'ic-sm') + ' ' + esc(f) + '</span>').join('') + (st.files.length > 6 ? '<span class="pill no-dot">+' + (st.files.length - 6) + ' file</span>' : '') +
       '<span class="muted" style="font-size:12.5px">' + fmtInt(H.siswa.length) + ' sheet mahasiswa terbaca</span><span class="spacer"></span><button class="btn btn-sm btn-ghost" id="un-ganti">' + ic('upload', 'ic-sm') + 'Ganti file</button></div>' +
+      (R.ditulis ? '' : '<div class="alert warn mb-8">' + ic('warn') + '<div><b>Belum ada nilai yang bisa disimpan</b>, jadi tombol Simpan belum aktif. Perbaiki penyebab di bawah — pratinjau diperbarui otomatis.</div></div>') +
       '<div class="ringkas-batal">' + kotak(R.ditulis, 'nilai akan disimpan', 'un-utama') + kotak(R.mhsCocok, 'dari ' + R.mhs + ' mahasiswa cocok') + kotak(R.kelasBaru, 'kelas PDDIKTI baru') + kotak(R.kelasLama, 'kelas lama diisi') + kotak(lewatBaris, 'baris dilewati') + '</div>' +
       '<div class="un-opsi mt-12"><label class="check"><input type="checkbox" id="un-timpa"' + (st.opsi.timpa ? ' checked' : '') + '>Timpa nilai yang berbeda <span class="muted">(hanya yang belum dilapor)</span></label>' +
       '<label class="check"><input type="checkbox" id="un-lapor"' + (st.opsi.lapor ? ' checked' : '') + '>Nilai ini sudah ada di PDDIKTI (Neo Feeder) → tandai <b>SUDAH DILAPOR</b> <span class="muted">(huruf &amp; indeks dari file, langsung terkunci)</span></label></div>' +
@@ -877,6 +896,7 @@ function unggahNilaiMhs(o) {
     $('#un-timpa', box).onchange = (e) => { st.opsi.timpa = e.target.checked; cek(); };
     $('#un-lapor', box).onchange = (e) => { st.opsi.lapor = e.target.checked; cek(); };
     $('#un-perlu', box).onchange = (e) => { st.perlu = e.target.checked; tahap2(); };
+    $$('[data-isi-tahun]', box).forEach((b) => { b.onclick = () => isiTahunKurikulum(b.dataset.isiTahun, b.dataset.saran, () => cek()); });   // v1.3.1
     const tb = $('#un-tbl', box);
     tb.addEventListener('click', (e) => {
       if (e.target.closest('select')) return;
@@ -984,4 +1004,65 @@ async function unduhDaftarFeeder(k, kelasId) {
   const info = d.peringatan.slice();
   if (d.klaim.length > 1) info.push('MK ini diklaim untuk ' + d.klaim.length + ' MK PDDIKTI (' + d.klaim.map((c) => c.kode).join(', ') + ') — tiap mahasiswa muncul ' + d.klaim.length + ' baris.');
   toast(info.length ? 'Daftar diunduh. ' + info.join(' ') : 'Daftar nilai (format impor Neo Feeder) diunduh.', info.length ? 'warn' : 'ok', info.length ? 9000 : 3200);
+}
+
+/* ==========================================================================
+   v1.3.1 — ISI TAHUN KURIKULUM YANG KOSONG
+   MK kurikulum tanpa tahun tidak pernah berlaku untuk angkatan mana pun. Modal ini mengisi tahunnya sekaligus
+   (bisa dibatalkan lewat Kurikulum → Riwayat impor). setelah(tahun) dipanggil sesudah berhasil.
+   ========================================================================== */
+function isiTahunKurikulum(prodi, saran, setelah) {
+  const n = (App.M.kurikulum || []).filter((k) => k.prodi === prodi && !String(k.tahun_kurikulum ?? '').trim()).length;
+  const ada = unikk((App.M.kurikulum || []).filter((k) => k.prodi === prodi && String(k.tahun_kurikulum ?? '').trim()).map((k) => String(k.tahun_kurikulum).trim())).sort();
+  modal({ judul: 'Isi tahun kurikulum ' + prodi,
+    desc: (n ? fmtInt(n) + ' MK' : 'MK') + ' kurikulum <b>' + esc(prodi) + '</b> yang belum punya tahun akan diberi tahun ini sekaligus.',
+    isi: '<div class="field"><label class="req">Tahun kurikulum</label><input class="input" id="it-tahun" inputmode="numeric" maxlength="4" value="' + esc(/^\d{4}$/.test(String(saran || '')) ? saran : '') + '" placeholder="mis. 2019" style="width:140px"></div>' +
+      '<div class="hint mt-8">Kurikulum yang berlaku untuk suatu angkatan = tahun kurikulum terbaru yang ≤ tahun angkatan. Bila ' + esc(prodi) + ' hanya punya satu kurikulum, tahun berapa pun tetap berlaku untuk semua angkatan — biasanya diisi tahun mulai kurikulum itu dipakai (mis. 2019).' +
+      (ada.length ? ' Tahun yang sudah ada: <b>' + esc(ada.join(', ')) + '</b>.' : '') + ' Bisa dibatalkan lewat <b>Kurikulum → Riwayat impor</b>.</div>',
+    tombol: [{ teks: 'Batal', aksi: () => true }, { teks: 'Isi tahun', kelas: 'btn-primary', ikon: 'check', aksi: async (close, m) => {
+      const t = $('#it-tahun', m).value.trim();
+      if (!/^\d{4}$/.test(t)) { toast('Isi tahun 4 angka, mis. 2019.', 'warn'); return false; }
+      const r = await api('kurikulum.isiTahun', { prodi: prodi, tahun: t });
+      if (!r.success) { toast(r.message, 'err', 7000); return false; }
+      await App.segarkanMaster(); toast(r.message, 'ok', 6000); close();
+      if (setelah) setelah(t);
+      return false;
+    } }] });
+}
+
+/* ==========================================================================
+   v1.4 — HAPUS KELAS (mis. kelas yang MK riilnya sudah dihapus → "(MK dihapus)")
+   Pratinjau dulu (kelas.hapusCek): kelas dengan nilai SUDAH DILAPOR tidak bisa dihapus; kelas yang sudah
+   punya nilai (belum dilapor) hanya ikut dihapus bila dicentang. Ketik HAPUS. Bisa dibatalkan (batch KLSDEL-).
+   ========================================================================== */
+async function hapusKelas(ids, setelah) {
+  ids = (ids || []).filter(Boolean);
+  if (!ids.length) return;
+  const c = await api('kelas.hapusCek', { ids: ids });
+  if (!c.success) { toast(c.message, 'err'); return; }
+  const D = c.data.daftar, R = c.data.ringkas;
+  if (!D.length) { toast('Kelas tidak ditemukan — mungkin sudah dihapus. Tekan Refresh.', 'warn'); if (setelah) setelah(); return; }
+  const st = (x) => !x.bisa ? '<span class="pill s-SD">' + x.dilapor + ' sudah dilapor · tidak bisa</span>' : x.terisi ? '<span class="pill warn">' + x.terisi + ' nilai terisi</span>' : '<span class="pill no-dot">belum ada nilai</span>';
+  const md = modal({ judul: 'Hapus ' + (D.length > 1 ? D.length + ' kelas' : 'kelas'), lebar: 'lebar',
+    desc: 'Kelas dan daftar pesertanya dihapus dari Perkuliahan &amp; Nilai. Data mahasiswa, MK, dan Peta Klaim tidak tersentuh. Bisa dibatalkan lewat <b>Riwayat hapus kelas</b>.',
+    isi: '<div class="tbl-wrap" style="max-height:44vh"><table class="tbl tbl-compact"><thead><tr><th>Mata kuliah</th><th>Periode</th><th>Program</th><th class="num">Peserta</th><th>Nilai</th></tr></thead><tbody>' +
+      D.map((x) => '<tr class="' + (x.bisa ? '' : 'r-off') + '"><td>' + (x.yatim ? '<span class="danger-t">(MK dihapus)</span>' : esc(x.mk)) + '<div class="sub">' + esc(x.prodi + ' · angkatan ' + x.angkatan) + '</div></td><td class="nowrap">' + esc(labelPeriode(x.periode)) + '</td><td>' + esc(x.pddikti ? 'PDDIKTI' : progLabel(x.program)) + (x.rombel && x.rombel !== 'A' ? ' · ' + esc(x.rombel) : '') + '</td><td class="num">' + fmtInt(x.peserta) + '</td><td>' + st(x) + '</td></tr>').join('') + '</tbody></table></div>' +
+      (R.bernilai ? '<label class="check mt-12"><input type="checkbox" id="hk-nilai">Hapus juga ' + R.bernilai + ' kelas yang sudah punya nilai (' + fmtInt(R.terisi) + ' nilai belum dilapor)</label>' : '') +
+      (R.terkunci ? '<div class="alert info mt-12">' + ic('lock') + '<div>' + R.terkunci + ' kelas punya nilai yang sudah dilapor — dilewati (nilai yang sudah dilapor tidak boleh berubah).</div></div>' : '') +
+      '<div class="field mt-12"><label>Ketik <b>HAPUS</b> untuk konfirmasi</label><input class="input" id="hk-ketik" autocomplete="off" style="max-width:200px"></div>',
+    tombol: [
+      { teks: 'Riwayat hapus kelas', ikon: 'history', kiri: true, aksi: () => { modalRiwayatBatch('Riwayat hapus kelas', /^KLSDEL-/, 'Kelas yang dihapus bisa dikembalikan utuh beserta peserta & nilainya.', () => { if (setelah) setelah(); }); return false; } },
+      { teks: 'Batal', aksi: () => true },
+      { teks: 'Hapus', kelas: 'btn-danger', ikon: 'trash', aksi: async (close, m) => {
+        if ($('#hk-ketik', m).value.trim() !== 'HAPUS') { toast('Ketik HAPUS untuk konfirmasi.', 'warn'); return false; }
+        const ikut = !!($('#hk-nilai', m) || {}).checked;
+        const n = D.filter((x) => x.bisa && (!x.terisi || ikut)).length;
+        if (!n) { toast(R.bernilai ? 'Kelas itu sudah punya nilai — centang "Hapus juga…" bila memang ingin dihapus.' : 'Tidak ada kelas yang bisa dihapus.', 'warn', 6000); return false; }
+        const r = await api('kelas.hapus', { ids: D.map((x) => x.id), sertakanNilai: ikut, konfirmasi: 'HAPUS' });
+        if (!r.success) { toast(r.message, 'err', 7000); return false; }
+        toast(r.message, 'ok', 6000); close();
+        if (setelah) setelah();
+        return false;
+      } }] });
+  return md;
 }
